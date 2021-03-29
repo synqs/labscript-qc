@@ -9,10 +9,10 @@ import uuid
 import datetime
 
 # Create your views here.
-di = {'backend_name': 'atomic_mixtures',
+config_dict = {'backend_name': 'SoPa_atomic_mixtures',
  'backend_version': '0.0.1',
  'n_qubits': 2,     # number of wires
- 'atomic_species': ['Na', 'K'] ,
+ 'atomic_species': ['na', 'k'] ,
  'basis_gates': ['delay', 'rx'],
  'gates': [
     {'name': 'delay',
@@ -35,57 +35,128 @@ di = {'backend_name': 'atomic_mixtures',
  'coupling_map': [[0, 1]],
  'max_experiments': 3,
  'description': 'Setup of an atomic mixtures experiment with one trapping site and two atomic species, namely Na and K.',
- 'url': 'http://url_of_the_remote_server',
+ 'url': 'https://jendrzejewski.synqs.org/',
  'credits_required': False,
  'online_date': 'Since_big_bang',
  'display_name': 'SoPa'}
 
+
+result_dict = {
+    'backend_name': 'SoPa_atomic_mixtures',
+    'backend_version': '0.0.1',
+    'job_id': 'None',
+    'qobj_id': None,
+    'success': True,
+    'header': {},
+    'results': [
+        {
+            'header': {'name': 'experiment_blah', 'extra metadata': 'text'},
+            'shots': 3,
+            'success': True,
+            'meas_return': 'single',
+            'meas_level': 1,
+            'data': {      # slot 1 (Na)      # slot 2 (Li)
+                'memory': [[[90012.,  9988.], [5100., 4900.]],  # Shot 1
+                           [[89900., 10100.], [5000., 5000.]],  # Shot 2
+                           [[90000., 10000.], [5050., 4950.]]]  # Shot 3
+            }
+        }
+    ]
+}
+
+
 @csrf_exempt
-def config(request):
+def get_config(request):
     if request.method == 'GET':
-        return JsonResponse(di)
-
-@csrf_exempt
-def upload(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.POST['json'])
-            #process the json data
-        except:
-            return HttpResponse("Error loading json data!")
-
-        #dir = os.path.join(settings.MEDIA_ROOT, "uploads")
-        dir = R'C:\Users\Rohit_Prasad_Bhatt\Documents\Django_labscript\media\uploads'
-        os.makedirs(dir, exist_ok=True)
-        job_id = (datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S_")) + (uuid.uuid4().hex)[:5]
-        json_name = 'file_' + job_id + '.json'
-        json_path = os.path.join(dir,json_name)
-        with open(json_path, 'w') as f:
-            json.dump(data, f)
-
+        return JsonResponse(config_dict)
     else:
-        return HttpResponseNotFound()
-
-    return HttpResponse("Got your json. Your JOB ID is : "+job_id)
+        return HttpResponse('Only GET request allowed!')
 
 @csrf_exempt
-def check_shot_status(request):
+def post_job(request):
+    job_response_dict = {'job_id': 'None','status': 'None','detail': 'None'}
     if request.method == 'POST':
         try:
             data = json.loads(request.POST['json'])
+        except:
+            job_response_dict['detail'] = 'Error loading json data!'
+            return JsonResponse(job_response_dict)
+        try:
+            dir = R'D:\Django_server_data\uploads'
+            os.makedirs(dir, exist_ok=True)
+            job_id = (datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S_')) + (uuid.uuid4().hex)[:5]
+            json_name = 'file_' + job_id + '.json'
+            json_path = os.path.join(dir,json_name)
+            with open(json_path, 'w') as f:
+                json.dump(data, f)
+        except:
+            job_response_dict['detail'] = 'Error saving json data!'
+            return JsonResponse(job_response_dict)
+    else:
+        return HttpResponse('Only POST request allowed!')
+
+    job_response_dict['job_id'] = job_id
+    job_response_dict['status'] = 'INITIALIZING'
+    job_response_dict['detail'] = 'Got your json.'
+    json_status_folder = R'D:\Django_server_data\uploads\status'
+    status_file_name = 'status_'+job_id+'.json'
+    status_file_path = os.path.join(json_status_folder, status_file_name)
+    with open(status_file_path, 'w') as status_file:
+        json.dump(job_response_dict, status_file)
+    return JsonResponse(job_response_dict)
+
+@csrf_exempt
+def get_job_status(request):
+    status_msg_dict = {'job_id': 'None','status': 'None','detail': 'None'}
+    if request.method == 'GET':
+        try:
+            data = json.loads(request.GET['json'])
             job_id = data['job_id']
+            status_msg_dict['job_id'] = job_id
         except:
-            return HttpResponse("Error loading JOB ID !")
-
-        json_status_folder = R'C:\Users\Rohit_Prasad_Bhatt\Documents\Django_labscript\media\uploads\status'
-        status_file_name = 'status_'+job_id+'.txt'
-        status_file_path = os.path.join(json_status_folder, status_file_name)
+            status_msg_dict['detail'] = 'Error loading json data!'
+            return JsonResponse(status_msg_dict)
         try:
-            with open(status_file_path, "r") as status_file:
-                status_msg = status_file.read()
+            assert len(job_id)==21
+            json_status_folder = R'D:\Django_server_data\uploads\status'
+            status_file_name = 'status_'+job_id+'.json'
+            status_file_path = os.path.join(json_status_folder, status_file_name)
+            with open(status_file_path) as status_file:
+                status_msg_dict = json.load(status_file)
         except:
-            return HttpResponse("Invalid JOB ID !")
+            status_msg_dict['detail'] = 'Error getting status. Maybe invalid JOB ID!'
+            return JsonResponse(status_msg_dict)
     else:
-        return HttpResponseNotFound()
+        return HttpResponse('Only GET request allowed!')
 
-    return HttpResponse(status_msg)
+    return JsonResponse(status_msg_dict)
+
+@csrf_exempt
+def get_job_result(request):
+    status_msg_dict = {'job_id': 'None','status': 'None','detail': 'None'}
+    if request.method == 'GET':
+        try:
+            data = json.loads(request.GET['json'])
+            job_id = data['job_id']
+            status_msg_dict['job_id'] = job_id
+        except:
+            status_msg_dict['detail'] = 'Error loading json data!'
+            return JsonResponse(status_msg_dict)
+        try:
+            assert len(job_id)==21
+            json_status_folder = R'D:\Django_server_data\uploads\status'
+            status_file_name = 'status_'+job_id+'.json'
+            status_file_path = os.path.join(json_status_folder, status_file_name)
+            with open(status_file_path) as status_file:
+                status_msg_dict = json.load(status_file)
+        except:
+            status_msg_dict['detail'] = 'Error getting status. Maybe invalid JOB ID!'
+            return JsonResponse(status_msg_dict)
+        if status_msg_dict['status'] == 'DONE':
+            job_id = status_msg_dict['job_id']
+            result_dict['job_id'] = job_id
+            return JsonResponse(result_dict)
+        else:
+            return JsonResponse(status_msg_dict)
+    else:
+        return HttpResponse('Only GET request allowed!')
