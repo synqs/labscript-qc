@@ -5,9 +5,9 @@ import time
 import shutil
 
 remoteClient = runmanager.remote.Client()
-recieved_json_folder = R'C:\Users\Rohit_Prasad_Bhatt\Documents\Django_labscript\media\uploads'
-executed_json_folder = R'C:\Users\Rohit_Prasad_Bhatt\Documents\Django_labscript\media\uploads\executed'
-json_status_folder = R'C:\Users\Rohit_Prasad_Bhatt\Documents\Django_labscript\media\uploads\status'
+recieved_json_folder = R'Y:\uploads'
+executed_json_folder = R'Y:\uploads\executed'
+json_status_folder = R'Y:\uploads\status'
 exp_script_folder = R'C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\labscriptlib\example_apparatus'
 
 def check_json_dict(json_dict):
@@ -19,7 +19,11 @@ def modify_shot_output_folder(job_id):
     remoteClient.set_shot_output_folder(modified_shot_folder)
 
 def gen_script_and_globals(json_dict):
-    globals_dict = {'user_id':json_dict['user_id'],'shots':json_dict['experiment_0']['shots']}
+    globals_dict = {'user_id':'sopa','shots':json_dict['experiment_0']['shots']}
+    try:
+        globals_dict['user_id'] = json_dict['user_id']
+    except:
+        pass
     remoteClient.set_globals(globals_dict)
     remoteClient.set_globals(globals_dict)
     script_name = 'Experiment_' + globals_dict['user_id'] + '.py'
@@ -32,13 +36,13 @@ def gen_script_and_globals(json_dict):
         with open(header_path, "r") as header_file:
             code=header_file.read()
     except:
-        print('Something wrong. Does path file exists?')
+        print('Something wrong. Does header file exists?')
 
     try:
         with open(exp_script, "w") as script_file:
             script_file.write(code)
     except:
-        print('Something wrong. Does path file exists?')
+        print('Something wrong. Does file path exists?')
 
     for i in range(len(ins_list)):
          inst = ins_list[i]
@@ -49,14 +53,14 @@ def gen_script_and_globals(json_dict):
              with open(exp_script, "a") as script_file:
                  script_file.write(code)
          except:
-             print('Something wrong. Does path file exists?')
+             print('Something wrong. Does file path exists?')
 
     code = 'stop(Experiment.t+0.1)'
     try:
         with open(exp_script, "a") as script_file:
             script_file.write(code)
     except:
-        print('Something wrong. Does path file exists?')
+        print('Something wrong. Does file path exists?')
     remoteClient.set_labscript_file(exp_script) # CAUTION !! This command only selects the file. It does not generate it!
     return exp_script
 
@@ -70,27 +74,36 @@ while True:
         job_id = (json_name)[5:-5]
         recieved_json_path = os.path.join(recieved_json_folder, json_name)
         executed_json_path = os.path.join(executed_json_folder, json_name)
-        status_file_name = 'status_'+job_id+'.txt'
+        status_file_name = 'status_'+job_id+'.json'
         status_file_path = os.path.join(json_status_folder, status_file_name)
+        status_msg_dict = {'job_id': 'None','status': 'None','detail': 'None'}
         with open(recieved_json_path) as file:
             data = json.load(file)
             json_is_fine = check_json_dict(data)
         if json_is_fine:
+            with open(status_file_path) as status_file:
+                status_msg_dict = json.load(status_file)
+                status_msg_dict['detail'] += '; Passed json sanity check'
             with open(status_file_path, 'w') as status_file:
-                status_msg = 'Passed json sanity check'
-                status_file.write(status_msg)
+                json.dump(status_msg_dict, status_file)
             exp_script = gen_script_and_globals(data)
             remoteClient.reset_shot_output_folder()
             modify_shot_output_folder(job_id)
             remoteClient.engage()
+            with open(status_file_path) as status_file:
+                status_msg_dict = json.load(status_file)
+                status_msg_dict['detail'] += '; Compilation done. Shots sent to BLACS'
+                status_msg_dict['status'] = 'RUNNING'
             with open(status_file_path, 'w') as status_file:
-                status_msg = 'Compilation done. Shots sent to BLACS'
-                status_file.write(status_msg)
+                json.dump(status_msg_dict, status_file)
             shutil.move(recieved_json_path, executed_json_path)
             #os.remove(recieved_json_path)
             #os.remove(exp_script)
         else:
+            with open(status_file_path) as status_file:
+                status_msg_dict = json.load(status_file)
+                status_msg_dict['detail'] += '; Failed json sanity check. File will be deleted'
+                status_msg_dict['status'] = 'ERROR'
             with open(status_file_path, 'w') as status_file:
-                status_msg = 'Failed json sanity check. File will be deleted'
-                status_file.write(status_msg)
+                json.dump(status_msg_dict, status_file)
             os.remove(recieved_json_path)
