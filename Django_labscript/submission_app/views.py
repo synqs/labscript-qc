@@ -37,7 +37,7 @@ config_dict = {'backend_name': 'SYNQS_NaLi_spins_backend',
  'open_pulse': False,       # backend supports open pulse
  'memory': True,            # backend supports memory
  'max_shots': 60,
- #'coupling_map': [[]],
+ 'coupling_map': [[]],
  'max_experiments': 3,
  'description': 'Setup of a cold atomic mixtures experiment with qudits.',
  'url': 'http://localhost:9000/shots/',
