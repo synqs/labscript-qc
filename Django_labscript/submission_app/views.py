@@ -9,36 +9,40 @@ import uuid
 import datetime
 
 # Create your views here.
-config_dict = {'backend_name': 'SoPa_atomic_mixtures',
+config_dict = {'backend_name': 'SYNQS_NaLi_spins_backend',
  'backend_version': '0.0.1',
- 'n_qubits': 2,     # number of wires
- 'atomic_species': ['na', 'k'] ,
- 'basis_gates': ['delay', 'rx'],
+ 'n_qubits': 5,     # number of wires
+ 'atomic_species': ['na'] ,
+ 'basis_gates': ['rLx', 'rLz', 'rLz2'],
  'gates': [
-    {'name': 'delay',
-     'parameters': ['tau', 'delta'],
-     'qasm_def': 'gate delay(tau, delta) {}',
-     'coupling_map': [[0, 1]],
-     'description': 'evolution under SCC Hamiltonian for time tau'},
-    {'name': 'rx',
-     'parameters': ['theta'],
-     'qasm_def': 'gate rx(theta) {}',
-     'coupling_map': [[0]],
-     'description': 'Rotation of the sodium spin'}],
- 'supported_instructions': ['delay', 'rx', 'measure', 'barrier'],
+    {'name': 'rLz',
+     'parameters': ['delta'],
+     'qasm_def': 'gate rLz(delta) {}',
+     'coupling_map': [[0],[1],[2],[3],[4]],
+     'description': 'Evolution under the Z gate'},
+     {'name': 'rLz2',
+      'parameters': ['chi'],
+      'qasm_def': 'gate rLz2(chi) {}',
+      'coupling_map': [[0],[1],[2],[3],[4]],
+      'description': 'Evolution under the Z2 gate'},
+    {'name': 'rLx',
+     'parameters': ['omega'],
+     'qasm_def': 'gate rx(omega) {}',
+     'coupling_map': [[0],[1],[2],[3],[4]],
+     'description': 'Evolution under the X gate'}],
+ 'supported_instructions': ['delay', 'rLx', 'rLz', 'rLz2', 'measure', 'barrier'],
  'local': False,            # backend is local or remote (as seen from user)
  'simulator': False,        # backend is a simulator
  'conditional': False,      # backend supports conditional operations
  'open_pulse': False,       # backend supports open pulse
  'memory': True,            # backend supports memory
  'max_shots': 60,
- 'coupling_map': [[0, 1]],
+ #'coupling_map': [[]],
  'max_experiments': 3,
- 'description': 'Setup of an atomic mixtures experiment with one trapping site and two atomic species, namely Na and K.',
- 'url': 'https://jendrzejewski.synqs.org/',
+ 'description': 'Setup of a cold atomic mixtures experiment with qudits.',
+ 'url': 'http://localhost:9000/shots/',
  'credits_required': False,
- 'online_date': 'Since_big_bang',
- 'display_name': 'SoPa'}
+ 'display_name': 'NaLi'}
 
 
 result_dict = {
