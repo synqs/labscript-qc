@@ -3,6 +3,7 @@ import runmanager.remote
 import os
 import time
 import shutil
+from jsonschema import validate
 
 remoteClient = runmanager.remote.Client()
 recieved_json_folder = R'Y:\uploads'
@@ -10,16 +11,82 @@ executed_json_folder = R'Y:\uploads\executed'
 json_status_folder = R'Y:\uploads\status'
 exp_script_folder = R'C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\labscriptlib\example_apparatus'
 
-def check_json_dict(json_dict):
-    return True
+exper_schema={"type":"object","required":["instructions","shots","num_wires"],
+ "properties":{
+     "instructions":{"type":"array","items":{"type":"array"}},
+     "shots":{"type":"number","minimum":0,"maximum":60},
+     "num_wires":{"type":"number","minimum":1,"maximum":2}
+ },
+"additionalProperties": False}
 
-def modify_shot_output_folder(job_id):
+rLx_schema = {
+  "type": "array",
+  "minItems": 3,
+  "maxItems": 3,
+  "items": [
+    {
+      "type": "string","enum": ['rLx']
+    },
+    {
+      "type": "array","maxItems": 2,"items": [{"type": "number","minimum": 0,"maximum": 1}]
+    },
+    {
+      "type": "array","items": [{"type": "number","minimum": 0,"maximum": 6.284}]
+    }
+  ]
+}
+
+barrier_measure_schema = {
+  "type": "array",
+  "minItems": 3,
+  "maxItems": 3,
+  "items": [
+    {
+      "type": "string","enum": ['measure','barrier']
+    },
+    {
+      "type": "array","maxItems": 2,"items": [{"type": "number","minimum": 0,"maximum": 1}]
+    },
+    {
+      "type": "array","maxItems": 0
+    }
+  ]
+}
+
+def check_with_schema(obj,schm):
+    try:
+        validate(instance = obj, schema = schm)
+        return True
+    except:
+        return False
+
+def check_json_dict(json_dict):
+    ins_schema_dict = {'rLx':rLx_schema, 'barrier':barrier_measure_schema, 'measure':barrier_measure_schema}
+    for e in json_dict:
+        exp_ok = e.startswith('experiment_') and e[11:].isdigit()
+        if not exp_ok:
+            break
+        exp_ok = (int(e[11:])<=3) and check_with_schema(json_dict[e], exper_schema)
+        if not exp_ok:
+            break
+        ins_list = json_dict[e]['instructions']
+        for ins in ins_list:
+            try:
+                exp_ok = check_with_schema(ins, ins_schema_dict[ins[0]])
+            except:
+                exp_ok = False
+            if not exp_ok:
+                break
+    return exp_ok
+
+def modify_shot_output_folder(new_dir):
     defaut_shot_folder = str(remoteClient.get_shot_output_folder())
-    modified_shot_folder = (defaut_shot_folder.rsplit('\\',1)[0])+'\\'+job_id
+    modified_shot_folder = (defaut_shot_folder.rsplit('\\',1)[0])+'\\'+new_dir
     remoteClient.set_shot_output_folder(modified_shot_folder)
 
 def gen_script_and_globals(json_dict):
-    globals_dict = {'user_id':'sopa','shots':json_dict['experiment_0']['shots']}
+    globals_dict = {'user_id':'guest','shots':json_dict[next(iter(json_dict))]['shots']}
+    globals_dict['shots'] = 4
     try:
         globals_dict['user_id'] = json_dict['user_id']
     except:
@@ -28,8 +95,8 @@ def gen_script_and_globals(json_dict):
     remoteClient.set_globals(globals_dict)
     script_name = 'Experiment_' + globals_dict['user_id'] + '.py'
     exp_script = os.path.join(exp_script_folder, script_name)
-    ins_list = json_dict['experiment_0']['instructions']
-    func_dict = {'rx':'rx','delay':'delay','measure':'measure'}
+    ins_list = json_dict[next(iter(json_dict))]['instructions']
+    func_dict = {'rLx':'rLx','rLz2':'rLz2','rLz':'rLz','delay':'delay','measure':'measure','barrier':'barrier'}
     header_path = R'C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\labscriptlib\example_apparatus\header.py'
     code = ''
     try:
@@ -86,10 +153,13 @@ while True:
                 status_msg_dict['detail'] += '; Passed json sanity check'
             with open(status_file_path, 'w') as status_file:
                 json.dump(status_msg_dict, status_file)
-            exp_script = gen_script_and_globals(data)
-            remoteClient.reset_shot_output_folder()
-            modify_shot_output_folder(job_id)
-            remoteClient.engage()
+            #remoteClient.reset_shot_output_folder()
+            for exp in data:
+                exp_dict = {exp:data[exp]}
+                exp_script = gen_script_and_globals(exp_dict)
+                remoteClient.reset_shot_output_folder()
+                modify_shot_output_folder(job_id+ '\\' + str(exp))
+                remoteClient.engage()
             with open(status_file_path) as status_file:
                 status_msg_dict = json.load(status_file)
                 status_msg_dict['detail'] += '; Compilation done. Shots sent to BLACS'
