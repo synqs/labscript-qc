@@ -8,4 +8,4 @@ from waitress import logging
 if __name__ == '__main__':
     logger = logging.getLogger('waitress')
     logger.setLevel(logging.INFO)
-    serve(application,  listen="XX.XX.XX.XX:8000 localhost:8000")#, port='8000', host='129.206.182.92'
+    serve(application,  listen="XX.XX.XX.XX:8000 localhost:8000")
