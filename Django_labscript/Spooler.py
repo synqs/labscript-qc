@@ -10,12 +10,12 @@ recieved_json_folder = R'Y:\uploads'
 executed_json_folder = R'Y:\uploads\executed'
 json_status_folder = R'Y:\uploads\status'
 exp_script_folder = R'C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\labscriptlib\example_apparatus'
-
+num_qudits=5
 exper_schema={"type":"object","required":["instructions","shots","num_wires"],
  "properties":{
      "instructions":{"type":"array","items":{"type":"array"}},
      "shots":{"type":"number","minimum":0,"maximum":60},
-     "num_wires":{"type":"number","minimum":1,"maximum":2}
+     "num_wires":{"type":"number","minimum":1,"maximum":num_qudits}
  },
 "additionalProperties": False}
 
@@ -25,10 +25,10 @@ rLx_schema = {
   "maxItems": 3,
   "items": [
     {
-      "type": "string","enum": ['rLx']
+      "type": "string","enum": ['rLx','rLz','rLz2']
     },
     {
-      "type": "array","maxItems": 2,"items": [{"type": "number","minimum": 0,"maximum": 1}]
+      "type": "array","maxItems": 1,"items": [{"type": "number","minimum": 0,"maximum": (num_qudits-1)}]
     },
     {
       "type": "array","items": [{"type": "number","minimum": 0,"maximum": 6.284}]
@@ -45,7 +45,7 @@ barrier_measure_schema = {
       "type": "string","enum": ['measure','barrier']
     },
     {
-      "type": "array","maxItems": 2,"items": [{"type": "number","minimum": 0,"maximum": 1}]
+      "type": "array","maxItems": num_qudits,"items": [{"type": "number","minimum": 0,"maximum": (num_qudits-1)}]
     },
     {
       "type": "array","maxItems": 0
@@ -61,7 +61,7 @@ def check_with_schema(obj,schm):
         return False
 
 def check_json_dict(json_dict):
-    ins_schema_dict = {'rLx':rLx_schema, 'barrier':barrier_measure_schema, 'measure':barrier_measure_schema}
+    ins_schema_dict = {'rLx':rLx_schema, 'rLz':rLx_schema,'rLz2':rLx_schema,'barrier':barrier_measure_schema, 'measure':barrier_measure_schema}
     for e in json_dict:
         exp_ok = e.startswith('experiment_') and e[11:].isdigit()
         if not exp_ok:
@@ -122,7 +122,7 @@ def gen_script_and_globals(json_dict):
          except:
              print('Something wrong. Does file path exists?')
 
-    code = 'stop(Experiment.t+0.1)'
+    code = 'Experiment.final_action()'+'\n'+'stop(Experiment.t+0.1)'
     try:
         with open(exp_script, "a") as script_file:
             script_file.write(code)
@@ -153,7 +153,7 @@ while True:
                 status_msg_dict['detail'] += '; Passed json sanity check'
             with open(status_file_path, 'w') as status_file:
                 json.dump(status_msg_dict, status_file)
-            #remoteClient.reset_shot_output_folder()
+            ##remoteClient.reset_shot_output_folder()
             for exp in data:
                 exp_dict = {exp:data[exp]}
                 exp_script = gen_script_and_globals(exp_dict)

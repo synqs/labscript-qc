@@ -45,30 +45,6 @@ config_dict = {'backend_name': 'SYNQS_NaLi_spins_backend',
  'credits_required': False,
  'display_name': 'NaLi'}
 
-
-result_dict = {
-    'backend_name': 'SoPa_atomic_mixtures',
-    'backend_version': '0.0.1',
-    'job_id': 'None',
-    'qobj_id': None,
-    'success': True,
-    'header': {},
-    'results': [
-        {
-            'header': {'name': 'experiment_blah', 'extra metadata': 'text'},
-            'shots': 3,
-            'success': True,
-            'meas_return': 'single',
-            'meas_level': 1,
-            'data': {      # slot 1 (Na)      # slot 2 (Li)
-                'memory': [[[90012.,  9988.], [5100., 4900.]],  # Shot 1
-                           [[89900., 10100.], [5000., 5000.]],  # Shot 2
-                           [[90000., 10000.], [5050., 4950.]]]  # Shot 3
-            }
-        }
-    ]
-}
-
 @csrf_exempt
 def change_password(request):
     if request.method == 'POST':
@@ -214,7 +190,10 @@ def get_job_result(request):
                 return JsonResponse(status_msg_dict)
             if status_msg_dict['status'] == 'DONE':
                 job_id = status_msg_dict['job_id']
-                result_dict['job_id'] = job_id
+                result_json_folder=R'D:\Django_server_data\uploads\results'
+                result_json_path=os.path.join(result_json_folder,'result_'+job_id+'.json')
+                with open(result_json_path) as result_file:
+                    result_dict = json.load(result_file)
                 return JsonResponse(result_dict)
             else:
                 return JsonResponse(status_msg_dict)
