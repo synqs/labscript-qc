@@ -10,11 +10,9 @@ from lyse import *
 import pandas as pd
 import h5py
 
-
 def get_spin_up_down_atoms(Atom_image,Ref_image,Dark_image):
     atoms_per_site = np.arange(1e4,4e4,1e4)
     return atoms_per_site, 0.1*atoms_per_site
-
 
 def store_result(shot_path):
     with h5py.File(shot_path, 'r+') as f:
@@ -30,7 +28,6 @@ def store_result(shot_path):
             site=str(i)
             atom_num_arr = np.array((Spin_up[i],Spin_down[i]))
             analyis_results_group.attrs.create('Wire_'+site, data=atom_num_arr, shape=np.shape(atom_num_arr))
-
 
 def move_to_sds(shot_path,running_file_path,finished_file_path):
     dst_path=str('D')+shot_path[1:]
@@ -125,25 +122,23 @@ def do_analysis():
         with open(job_dict_file, 'r') as f:
             job_dict = json.load(f)
 
-        file_name=list(fn for fn in next(os.walk(running_folder))[2] if fn!='multi_analysis_dict.json')#sort this list
-        if not file_name:
-            continue
-
-        file_name=sorted(file_name)[0]
-        running_file_path = os.path.join(running_folder,file_name)
-        finished_file_path = os.path.join(finished_folder,file_name)
-        with open(running_file_path, "r") as text_file:
-            shot_path=text_file.read()
-
-        store_result(shot_path)
-        shot_path=move_to_sds(shot_path,running_file_path,finished_file_path)
-
-        current_job_id=file_name.split('-')[0]
-        current_job_id_folder=os.path.join(shot_path.split(current_job_id)[0],current_job_id)
-
         job_id_list=list(job_dict.keys())
-        if not current_job_id in job_id_list:
-            job_dict[current_job_id]=current_job_id_folder
+        file_name=list(fn for fn in next(os.walk(running_folder))[2] if fn!='multi_analysis_dict.json')#sort this list
+        if file_name:
+            file_name=sorted(file_name)[0]
+            running_file_path = os.path.join(running_folder,file_name)
+            finished_file_path = os.path.join(finished_folder,file_name)
+            with open(running_file_path, "r") as text_file:
+                shot_path=text_file.read()
+
+            store_result(shot_path)
+            shot_path=move_to_sds(shot_path,running_file_path,finished_file_path)
+
+            current_job_id=file_name.split('-')[0]
+            current_job_id_folder=os.path.join(shot_path.split(current_job_id)[0],current_job_id)
+
+            if not current_job_id in job_id_list:
+                job_dict[current_job_id]=current_job_id_folder
 
         job_id_list=list(job_dict.keys())
         job_done=False
