@@ -56,28 +56,37 @@ barrier_measure_schema = {
 def check_with_schema(obj,schm):
     try:
         validate(instance = obj, schema = schm)
-        return True
-    except:
-        return False
+        return '',True
+    except Exception as e:
+        return str(e),False
 
 def check_json_dict(json_dict):
-    ins_schema_dict = {'rLx':rLx_schema, 'rLz':rLx_schema,'rLz2':rLx_schema,'barrier':barrier_measure_schema, 'measure':barrier_measure_schema}
+    ins_schema_dict = {'rLx':rLx_schema,'rLz':rLx_schema,'rLz2':rLx_schema,'barrier':barrier_measure_schema, 'measure':barrier_measure_schema}
+    max_exps=3
     for e in json_dict:
-        exp_ok = e.startswith('experiment_') and e[11:].isdigit()
+        err_code='Wrong experiment name or too many experiments'
+        try:
+            exp_ok = e.startswith('experiment_') and e[11:].isdigit() and (int(e[11:])<=max_exps)
+        except:
+            exp_ok = False
+            break
         if not exp_ok:
             break
-        exp_ok = (int(e[11:])<=3) and check_with_schema(json_dict[e], exper_schema)
+        err_code, exp_ok = check_with_schema(json_dict[e], exper_schema)
         if not exp_ok:
             break
         ins_list = json_dict[e]['instructions']
         for ins in ins_list:
             try:
-                exp_ok = check_with_schema(ins, ins_schema_dict[ins[0]])
-            except:
+                err_code, exp_ok = check_with_schema(ins, ins_schema_dict[ins[0]])
+            except Exception as e:
+                err_code='Wrong instruction '+str(e)
                 exp_ok = False
             if not exp_ok:
                 break
-    return exp_ok
+        if not exp_ok:
+            break
+    return err_code.replace('\n', '..'),exp_ok
 
 def modify_shot_output_folder(new_dir):
     defaut_shot_folder = str(remoteClient.get_shot_output_folder())
@@ -139,7 +148,7 @@ while True:
     else:
         json_name = (sorted(files))[0]
         ji_ui = (json_name)[5:-5]
-        job_id,user_id = ji_ui.split('-')
+        job_id, user_id = ji_ui.split('-')
         recieved_json_path = os.path.join(recieved_json_folder, json_name)
         executed_json_path = os.path.join(executed_json_folder, json_name)
         status_file_name = 'status_'+job_id+'.json'
@@ -147,7 +156,7 @@ while True:
         status_msg_dict = {'job_id': 'None','status': 'None','detail': 'None'}
         with open(recieved_json_path) as file:
             data = json.load(file)
-            json_is_fine = check_json_dict(data)
+            err_msg, json_is_fine = check_json_dict(data)
         if json_is_fine:
             with open(status_file_path) as status_file:
                 status_msg_dict = json.load(status_file)
@@ -173,7 +182,7 @@ while True:
         else:
             with open(status_file_path) as status_file:
                 status_msg_dict = json.load(status_file)
-                status_msg_dict['detail'] += '; Failed json sanity check. File will be deleted'
+                status_msg_dict['detail'] += '; Failed json sanity check. File will be deleted. Error message : '+err_msg
                 status_msg_dict['status'] = 'ERROR'
             with open(status_file_path, 'w') as status_file:
                 json.dump(status_msg_dict, status_file)
