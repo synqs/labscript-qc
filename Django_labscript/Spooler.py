@@ -84,11 +84,11 @@ def modify_shot_output_folder(new_dir):
     modified_shot_folder = (defaut_shot_folder.rsplit('\\',1)[0])+'\\'+new_dir
     remoteClient.set_shot_output_folder(modified_shot_folder)
 
-def gen_script_and_globals(json_dict):
+def gen_script_and_globals(json_dict,user_id):
     globals_dict = {'user_id':'guest','shots':json_dict[next(iter(json_dict))]['shots']}
     globals_dict['shots'] = 4
     try:
-        globals_dict['user_id'] = json_dict['user_id']
+        globals_dict['user_id'] = user_id
     except:
         pass
     remoteClient.set_globals(globals_dict)
@@ -138,7 +138,8 @@ while True:
         continue
     else:
         json_name = (sorted(files))[0]
-        job_id = (json_name)[5:-5]
+        ji_ui = (json_name)[5:-5]
+        job_id,user_id = ji_ui.split('-')
         recieved_json_path = os.path.join(recieved_json_folder, json_name)
         executed_json_path = os.path.join(executed_json_folder, json_name)
         status_file_name = 'status_'+job_id+'.json'
@@ -156,10 +157,10 @@ while True:
             ##remoteClient.reset_shot_output_folder()
             for exp in data:
                 exp_dict = {exp:data[exp]}
-                exp_script = gen_script_and_globals(exp_dict)
+                exp_script = gen_script_and_globals(exp_dict,user_id)
                 remoteClient.reset_shot_output_folder()
                 modify_shot_output_folder(job_id+ '\\' + str(exp))
-                remoteClient.engage()
+                remoteClient.engage()#check that this is blocking.
             with open(status_file_path) as status_file:
                 status_msg_dict = json.load(status_file)
                 status_msg_dict['detail'] += '; Compilation done. Shots sent to BLACS'

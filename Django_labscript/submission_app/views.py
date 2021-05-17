@@ -103,7 +103,7 @@ def post_job(request):
                 dir = R'D:\Django_server_data\uploads'
                 os.makedirs(dir, exist_ok=True)
                 job_id = (datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S_')) + (uuid.uuid4().hex)[:5]
-                json_name = 'file_' + job_id + '.json'
+                json_name = 'file_' + job_id + '-' + username +'.json'
                 json_path = os.path.join(dir,json_name)
                 with open(json_path, 'w') as f:
                     json.dump(data, f)
