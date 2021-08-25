@@ -3,4 +3,4 @@ labscript-qc
 .. toctree::
    :maxdepth: 16
 
-   README
+   user_guide_test
