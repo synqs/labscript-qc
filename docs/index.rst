@@ -1,6 +1,9 @@
-labscript-qc1
+labscript-qc
 ------------
+
+Documents
+=========
 .. toctree::
    :maxdepth: 16
 
-   user_guide_test
+   user_guide
