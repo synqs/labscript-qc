@@ -1,5 +1,5 @@
 from recommonmark.parser import CommonMarkParser
-extensions = ['myst_parser']
+
 source_parsers = {
 '.md': CommonMarkParser,
 }
