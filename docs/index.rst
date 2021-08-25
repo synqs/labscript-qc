@@ -1,4 +1,4 @@
-labscript-qc
+labscript-qc1
 ------------
 .. toctree::
    :maxdepth: 16
