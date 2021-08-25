@@ -15,9 +15,9 @@ In the next section we explain the server side in detail.
 ### The Django app
 
 We describe the Django app which controls the communication to the real machine, but for other apps, the views and their purpose are similar. Django is a Python-based free and open-source web framework. It uses the Model-View-Template architecture:
-- Model : Build databases from classes with the help of Object Relational Mapper (ORM).
-- View : Function executed whenever a particular URL receives an HTTP request. For every URL there is a corresponding view function.
-- Template : HTML/CSS code for inserting web elements in a HTML document.
+* Model : Build databases from classes with the help of Object Relational Mapper (ORM).
+* View : Function executed whenever a particular URL receives an HTTP request. For every URL there is a corresponding view function.
+* Template : HTML/CSS code for inserting web elements in a HTML document.
 
 Note that Django is just a framework to design webapps. Its not a server by itself. After writing a webapp it has to be hosted on a server. Although, Django also comes with a built-in server but this is meant only for local testing and development. In production environment one must use a proper server like Apache web server, Gunicorn, waitress etc. to host the webapp.
 
@@ -26,10 +26,10 @@ Another point is that although we have a Django webapp running on our server, it
 Before describing the server in detail, lets mention that for the client communicating with the server essentially boils down to sending correct HTTP request to the correct URL. Then on the server side Django will execute the view function corresponding to that URL.
 
 Now we explain different view functions and their purpose. :
-- **The get_config view** : This function returns a JSON dictionary containing the backend capabilities and details. At the moment this is relevant only for the Qiskit plugin as the pennylane plugin does not make use of it.
-- **The post_job view** : This function extracts the JSON dictionary describing a potential experiment from a HTTP request. The extracted JSON is dumped onto the hard disk for further processing. It then responds with another JSON dictionary which has a job_id key. This job_id is important to query the server for results of the experiment later on.
-- **The get_job_status view** : This function extracts the job_id of a previously submitted job from a HTTP request. It responds with a JSON dictionary describing the status.
-- **The get_job_result view** : This function extracts the job_id of a previously submitted job from a HTTP request. If the job has not finished running and results are unavailable, it responds with a JSON dictionary describing the status. Otherwise it responds with a JSON dictionary describing the result. The formatting of the result dictionary is done as decsribed in [1][eggerdj_github].
+* **The get_config view** : This function returns a JSON dictionary containing the backend capabilities and details. At the moment this is relevant only for the Qiskit plugin as the pennylane plugin does not make use of it.
+* **The post_job view** : This function extracts the JSON dictionary describing a potential experiment from a HTTP request. The extracted JSON is dumped onto the hard disk for further processing. It then responds with another JSON dictionary which has a job_id key. This job_id is important to query the server for results of the experiment later on.
+* **The get_job_status view** : This function extracts the job_id of a previously submitted job from a HTTP request. It responds with a JSON dictionary describing the status.
+* **The get_job_result view** : This function extracts the job_id of a previously submitted job from a HTTP request. If the job has not finished running and results are unavailable, it responds with a JSON dictionary describing the status. Otherwise it responds with a JSON dictionary describing the result. The formatting of the result dictionary is done as decsribed in [1][eggerdj_github].
 
 A typical JSON response from the server has the following schema:
 ``
@@ -65,14 +65,14 @@ For enabling the remote client to talk to the server we need to setup a secure c
 ![](ssh.png)
 
 The basic steps are:
-- We have a Virtual Machine in Mannheim (hosted on BW cloud) with a public IP address. This is is our SSH server. Anyone who is white-listed by us should be able to establish a SSH connection to this server.
-- The remote client establishes a SSH tunnel from his/her PC to SSH server and uses this tunnel for local port forwarding. This means the client forwards all internet traffic from one of the client's local port (client can choose this port at will) to a given port on SSH server (this port is decided by us).
-- Inside QisKit/pennylane plugins, the client should make request to the earlier selected local port. SSH local port forwarding will relay all the traffic from that local port to the specific port on the SSH server.
-- Now we also establish a SSH tunnel from our Django PC to SSH server and use this tunnel for remote port forwarding. This means we download all the traffic from the specific port of SSH server to a given port on our Django PC. This given port is basically our local port on which our local server (waitress in our case) is hosting the Django app.
-- So we have securely transferred the HTTP request from client to our server without allowing the client inside our university network. Also the client will easily receive the response from the server without needing to do anything extra.
-- This method provides the security and robustness of the SSH protocol and helps making our local server very secure. We never expose our local server to the outside world. Only very few white-listed people can reach it.
-- For every new remote client we will provide detailed instruction on what he/she has to do in order to get access.
-- This method although very secure is not so easily manageable once our remote user base grows. So we will think of other ways in future.
+* We have a Virtual Machine in Mannheim (hosted on BW cloud) with a public IP address. This is is our SSH server. Anyone who is white-listed by us should be able to establish a SSH connection to this server.
+* The remote client establishes a SSH tunnel from his/her PC to SSH server and uses this tunnel for local port forwarding. This means the client forwards all internet traffic from one of the client's local port (client can choose this port at will) to a given port on SSH server (this port is decided by us).
+* Inside QisKit/pennylane plugins, the client should make request to the earlier selected local port. SSH local port forwarding will relay all the traffic from that local port to the specific port on the SSH server.
+* Now we also establish a SSH tunnel from our Django PC to SSH server and use this tunnel for remote port forwarding. This means we download all the traffic from the specific port of SSH server to a given port on our Django PC. This given port is basically our local port on which our local server (waitress in our case) is hosting the Django app.
+* So we have securely transferred the HTTP request from client to our server without allowing the client inside our university network. Also the client will easily receive the response from the server without needing to do anything extra.
+* This method provides the security and robustness of the SSH protocol and helps making our local server very secure. We never expose our local server to the outside world. Only very few white-listed people can reach it.
+* For every new remote client we will provide detailed instruction on what he/she has to do in order to get access.
+* This method although very secure is not so easily manageable once our remote user base grows. So we will think of other ways in future.
 
 
 [eggerdj_github]: https://github.com/eggerdj/backends/ "Qiskit_json"
