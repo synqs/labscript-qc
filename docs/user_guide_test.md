@@ -1,7 +1,7 @@
 # Django for labscript
 
 ## The big picture
-There are two sides : server and client. A client is a remote user who will write quantum circuits in the user's favorite framework (Qiskit/Pennylane). These circuits then have to be compiled into JSON files. The JSON files can be sent over the internet to a remote server which will try to parse them into meaningful instructions for the backend. The backend can be a real cold atom machine or just a simulator running on a computer.
+There are two sides : server and client. A client is a remote user who will write quantum circuits in the user's favorite framework (Qiskit/Pennylane). These circuits then have to be compiled into JSON files. The JSON files can be sent over the internet to a remote server which will try to parse them into meaningful instructions for the backend. The backend can be a real cold atom machine or just a simulator running on a computer. hihh
 
 ## Components of the server
 
