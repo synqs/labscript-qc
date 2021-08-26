@@ -2,39 +2,49 @@
 ![](big_pic.png)
 
 ## The big picture
-There are two sides : server and client. A client is a remote user who will write quantum circuits in the user's favorite framework (Qiskit/Pennylane). These circuits then have to be compiled into JSON files. The JSON files can be sent over the internet to a remote server which will try to parse them into meaningful instructions for the backend. The backend can be a real cold atom machine or just a simulator running on a computer.
+There are two sides : server and client. A client is a remote user who will write quantum circuits in the user's favorite quantum circuit framework ([Qiskit][Qiskit_github]/[Pennylane][Pennylane_github]/something_else). These circuits then have to be compiled into JSON files. The JSON files can be sent over the internet to a remote server which will try to parse them into meaningful instructions for the backend. The backend can be a real cold atom machine or a simulator running on a computer.
 
 We have decided on a schema for the JSON files. See [1][eggerdj_github]  for more details. The document mentions in detail how things should be formatted.
 
-The code for compiling Qiskit circuits to JSON files is available at [1][eggerdj_github]. Similarly the code for compiling a pennylane circuit into JSON is available at [2][synqs_pennylane_github].
+The plugin for compiling Qiskit circuits to JSON files is available at [1][eggerdj_github]. Similarly the plugin for compiling a pennylane circuit into JSON is available at [2][synqs_pennylane_github]. That's all that is required on the client side. Basically choose one of these. If the client wants to use a different quantum circuit framework, then the client must write appropriate code for compiling quantum circuits of that framework into JSON files which follow the schema of [1][eggerdj_github].
 
-In the next section we explain the server side in detail.
+## Using SSH tunneling to reach the server
+For enabling the remote client to talk to the server we need to setup a secure communication link. For this we use SSH tunneling as shown below:
+![](ssh.png)
+
+The basic steps are:
+* We have a Virtual Machine with a public IP address. This is is our SSH server. Anyone who is white-listed by us should be able to establish a SSH connection to this server.
+* The remote client establishes a SSH tunnel from his/her PC to the SSH server and uses this tunnel for local port forwarding. This means the client forwards all internet traffic from one of the client's local port (client can choose this port at will) to a given port on SSH server (this port is decided by us).
+* Inside ([Qiskit][Qiskit_github]/[Pennylane][Pennylane_github]) plugins, the client should make request to the earlier selected local port. SSH local port forwarding will relay all the traffic from that local port to the specific port on the SSH server.
+* Now we also establish a SSH tunnel from our Django PC to SSH server and use this tunnel for remote port forwarding. This means we download all the traffic from the specific port of SSH server to a given port on our Django PC. This given port is basically our local port on which our local server ([waitress][Waitress_github] in our case) is hosting the Django app.
+* So we have securely transferred the HTTP request from client to our server without allowing the client inside our university network. Also the client will easily receive the response from the server without needing to do anything extra.
+* This method provides the security and robustness of the SSH protocol and helps making our local server very secure. We never expose our local server to the outside world. Only very few white-listed people can reach it.
+* For every new remote client we will provide detailed instruction on what he/she has to do in order to get access.
+* This method although very secure is not so easily manageable once our remote user base grows. So we will think of other ways in future.
 
 ## Components of the server
 
 ### The Django app
 
-We describe the Django app which controls the communication to the real machine, but for other apps, the views and their purpose are similar. Django is a Python-based free and open-source web framework. It uses the Model-View-Template architecture:
+We describe the [Django][Django_github] app which controls the communication to the real cold atom machine, but for other apps, the story is similar. Django is a Python-based free and open-source web framework. It uses the Model-View-Template architecture:
 * Model : Build databases from classes with the help of Object Relational Mapper (ORM).
 * View : Function executed whenever a particular URL receives an HTTP request. For every URL there is a corresponding view function.
 * Template : HTML/CSS code for inserting web elements in a HTML document.
 
-Note that Django is just a framework to design webapps. Its not a server by itself. After writing a webapp it has to be hosted on a server. Although, Django also comes with a built-in server but this is meant only for local testing and development. In production environment one must use a proper server like Apache web server, Gunicorn, waitress etc. to host the webapp.
+Note that [Django][Django_github] is just a framework to design webapps. Its not a server by itself. After writing a webapp it has to be hosted on a server. Although, Django also comes with a built-in server but this is meant only for local testing and development. In production environment one must use a proper server like [Apache web server][Apache], [Gunicorn][Gunicorn], [waitress][Waitress_github] etc. to host the webapp.
 
-Another point is that although we have a Django webapp running on our server, it is functionally equivalent to a REST API. REST API is a popular architecture of communicating with remote servers.
+Another point is that although we have a Django webapp running on our server, it is functionally equivalent to a REST API. REST API is a popular architecture of communicating with remote servers. [Django Rest Framework][DRF] is widely used for writing such REST APIs.
 
-Before describing the server in detail, lets mention that for the client communicating with the server essentially boils down to sending correct HTTP request to the correct URL. Then on the server side Django will execute the view function corresponding to that URL.
+Before describing the server in detail, lets mention that for the client, communicating with the server essentially boils down to sending correct HTTP request to the correct URL. Then on the server side Django will execute the view function corresponding to that URL.
 
-Now we explain different view functions and their purpose. :
+Now we explain different view functions and their purpose :
 * **The get_config view** : This function returns a JSON dictionary containing the backend capabilities and details. At the moment this is relevant only for the Qiskit plugin as the pennylane plugin does not make use of it.
-* **The post_job view** : This function extracts the JSON dictionary describing a potential experiment from a HTTP request. The extracted JSON is dumped onto the hard disk for further processing. It then responds with another JSON dictionary which has a job_id key. This job_id is important to query the server for results of the experiment later on.
+* **The post_job view** : This function extracts the JSON dictionary describing a potential experiment from a HTTP request. The extracted JSON is dumped onto the hard disk for further processing. It then responds with another JSON dictionary which has a job_id key. This job_id is important to query the server for results of the experiment later on. A typical JSON response from the server has the following schema:
+``
+{'job_id': 'something','status': 'something','detail': 'something'}
+``
 * **The get_job_status view** : This function extracts the job_id of a previously submitted job from a HTTP request. It responds with a JSON dictionary describing the status.
 * **The get_job_result view** : This function extracts the job_id of a previously submitted job from a HTTP request. If the job has not finished running and results are unavailable, it responds with a JSON dictionary describing the status. Otherwise it responds with a JSON dictionary describing the result. The formatting of the result dictionary is done as decsribed in [1][eggerdj_github].
-
-A typical JSON response from the server has the following schema:
-``
-{'job_id': 'None','status': 'None','detail': 'None'}
-``
 
 ### The Spooler.py
 After the post_job view dumps the JSON files on the hard disk they have to be processed further to execute experiments on the cold atom machine. Also dumping files on the hard disk acts as a job queue so we do not need to use any extra package to queue the jobs.
@@ -60,21 +70,16 @@ As the individual shots get executed they dump their complete HDF path in separa
 
 After moving to SDS the result.py updates a job_dictionary which is initially read from a text file. This dictionary keeps track of all running jobs. If the job_id of the shot just moved to SDS is not in this dictionary, it is included along-with its folder location in SDS. This dictionary is also useful to determine on which job a multi-shot analysis can be run. The result.py checks the first key in this dictionary and figures out if that job is done or not. If yes then it proceeds with multi-shot analysis for that job by using **Lyse** to generate CSV from pandas dataframe for each sub-folder of the experiments in a job. After generating CSVs it generates the result JSON for this job in a specific format given by the schema we decided in [1][eggerdj_github]. Then it updates the status of this job to 'DONE'. Finally the finished job is removed from the dictionary of running jobs.
 
-## Using SSH tunneling to reach the server
-For enabling the remote client to talk to the server we need to setup a secure communication link. For this we use SSH tunneling as shown below:
-![](ssh.png)
-
-The basic steps are:
-* We have a Virtual Machine in Mannheim (hosted on BW cloud) with a public IP address. This is is our SSH server. Anyone who is white-listed by us should be able to establish a SSH connection to this server.
-* The remote client establishes a SSH tunnel from his/her PC to SSH server and uses this tunnel for local port forwarding. This means the client forwards all internet traffic from one of the client's local port (client can choose this port at will) to a given port on SSH server (this port is decided by us).
-* Inside QisKit/pennylane plugins, the client should make request to the earlier selected local port. SSH local port forwarding will relay all the traffic from that local port to the specific port on the SSH server.
-* Now we also establish a SSH tunnel from our Django PC to SSH server and use this tunnel for remote port forwarding. This means we download all the traffic from the specific port of SSH server to a given port on our Django PC. This given port is basically our local port on which our local server (waitress in our case) is hosting the Django app.
-* So we have securely transferred the HTTP request from client to our server without allowing the client inside our university network. Also the client will easily receive the response from the server without needing to do anything extra.
-* This method provides the security and robustness of the SSH protocol and helps making our local server very secure. We never expose our local server to the outside world. Only very few white-listed people can reach it.
-* For every new remote client we will provide detailed instruction on what he/she has to do in order to get access.
-* This method although very secure is not so easily manageable once our remote user base grows. So we will think of other ways in future.
 
 
+
+[Qiskit_github]: https://github.com/Qiskit "Qiskit"
+[Pennylane_github]: https://github.com/PennyLaneAI "Pennylane"
 [eggerdj_github]: https://github.com/eggerdj/backends/ "Qiskit_json"
 [synqs_pennylane_github]: https://github.com/synqs/pennylane-ls "penny_json"
+[Waitress_github]: https://github.com/Pylons/waitress "Waitress"
+[Django_github]: https://github.com/django "Django"
+[Apache]: https://httpd.apache.org/ "Apache"
+[Gunicorn]: https://gunicorn.org/ "Gunicorn"
+[DRF]: https://github.com/encode/django-rest-framework "DRF"
 [labscript_github]: https://github.com/labscript-suite "labscript"
