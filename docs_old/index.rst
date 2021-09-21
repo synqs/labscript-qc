@@ -1,4 +1,4 @@
-coquma-sim
+labscript-qc
 ------------
 
 Documents

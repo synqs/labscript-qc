@@ -1,90 +1,138 @@
-# Django for labscript
-![](big_pic.png)
-
+# Django server for quantum computing backends
 ## The big picture
-We want to use our ultra-cold atom machines as platforms for executing experiments written as quantum circuits. In our experiment we use the [labscript suite][labscript_github] to control all hardware and for data analysis. But we need to tackle the following issues:
-* Labscript suite does not have native support for writing quantum circuits. 
+We want to use our quantum computing backends as platforms for executing experiments written as quantum circuits. These backends can be a real cold atom machine or a simulator running on a computer . But how will the backend understand a quantum circuit? For e.g. in our experiment we use the [labscript suite][labscript_github] to control all hardware and for data analysis. We need to tackle the following issues:
+* Labscript suite does not have native support for writing quantum circuits.
 * We want to allow remote users to be able to submit jobs to our backends. So we need a server architecture and user management.
 
-Hence the need for [this project][ls_qc_github].
+The above issues also hold for a simulator package which need not necessarily have the capability of directly parsing quantum circuits.
 
-There are two sides : server and client. A client is a remote user who will write quantum circuits in the user's favorite quantum circuit framework ([Qiskit][Qiskit_github]/[Pennylane][Pennylane_github]/something_else). These circuits then have to be compiled into JSON files. The JSON files can be sent over the internet to a remote server which will try to parse them into meaningful instructions for the backend. The backend can be a real cold atom machine or a simulator running on a computer.
+Hence the need for [this project][coquma_sim_github].
+
+There are two sides : server and client. A client is a remote user who will write quantum circuits in the user's favorite quantum circuit framework ([Qiskit][Qiskit_github]/[Pennylane][Pennylane_github]/something_else). These circuits then have to be compiled into JSON files. The JSON files can be sent over the internet to a remote server which will queue it for parsing/execution on the backend. The backend can be a real cold atom machine or a simulator running on a computer.
 
 We have decided on a schema for the JSON files. See [1][eggerdj_github]  for more details. The document mentions in detail how things should be formatted.
 
-The plugin for compiling Qiskit circuits to JSON files is available at [1][eggerdj_github]. Similarly the plugin for compiling a pennylane circuit into JSON is available at [2][synqs_pennylane_github]. That's all that is required on the client side. Basically choose one of these. If the client wants to use a different quantum circuit framework, then the client must write appropriate code for compiling quantum circuits of that framework into JSON files which follow the schema of [1][eggerdj_github].
+The plugin for compiling Qiskit circuits to JSON files is available at [1][eggerdj_github]. Similarly the plugin for compiling a pennylane circuit into JSON is available at [2][synqs_pennylane_github]. Note that the pennylane plugin at [2][synqs_pennylane_github] already offers several backends. Each backend is a device with its own operations.
 
-## Using SSH tunneling to reach the server
-For enabling the remote client to talk to the server we need to setup a secure communication link. For this we use SSH tunneling as shown below:
-![](ssh.png)
-
-The basic steps are:
-* We have a Virtual Machine with a public IP address. This is is our SSH server. Anyone who is white-listed by us should be able to establish a SSH connection to this server.
-* The remote client establishes a SSH tunnel from his/her PC to the SSH server and uses this tunnel for local port forwarding. This means the client forwards all internet traffic from one of the client's local port (client can choose this port at will) to a given port on SSH server (this port is decided by us).
-* Inside ([Qiskit][Qiskit_github]/[Pennylane][Pennylane_github]) plugins, the client should make request to the earlier selected local port. SSH local port forwarding will relay all the traffic from that local port to the specific port on the SSH server.
-* Now we also establish a SSH tunnel from our Django PC to SSH server and use this tunnel for remote port forwarding. This means we download all the traffic from the specific port of SSH server to a given port on our Django PC. This given port is basically our local port on which our local server ([waitress][Waitress_github] in our case) is hosting the Django app.
-* So we have securely transferred the HTTP request from client to our server without allowing the client inside our university network. Also the client will easily receive the response from the server without needing to do anything extra.
-* This method provides the security and robustness of the SSH protocol and helps making our local server very secure. We never expose our local server to the outside world. Only very few white-listed people can reach it.
-* For every new remote client we will provide detailed instruction on what he/she has to do in order to get access.
-* This method although very secure is not so easily manageable once our remote user base grows. So we will think of other ways in future.
+That's all that is required on the client side. Basically choose one of these frameworks. If the client wants to use a different quantum circuit framework, then the client must write appropriate code for compiling quantum circuits of that framework into JSON files which follow the schema of [1][eggerdj_github].
 
 ## Components of the server
-
-### The Django app
-
-We describe the [Django][Django_github] app which controls the communication to the real cold atom machine, but for other apps, the story is similar. Django is a Python-based free and open-source web framework. It uses the Model-View-Template architecture:
+![](arch.png)
+### The Heroku server
+The [Heroku][Heroku] platform hosts our [Django][Django_github] app. Django is a Python-based free and open-source web framework. It uses the Model-View-Template architecture:
 * Model : Build databases from classes with the help of Object Relational Mapper (ORM).
 * View : Function executed whenever a particular URL receives an HTTP request. For every URL there is a corresponding view function.
 * Template : HTML/CSS code for inserting web elements in a HTML document.
 
-Note that [Django][Django_github] is just a framework to design webapps. Its not a server by itself. After writing a webapp it has to be hosted on a server. Although, Django also comes with a built-in server but this is meant only for local testing and development. In production environment one must use a proper server like [Apache web server][Apache], [Gunicorn][Gunicorn], [waitress][Waitress_github] etc. to host the webapp.
+Note that [Django][Django_github] is just a framework to design web-apps. Its not a server by itself. After writing a webapp it has to be hosted on a server. Although, Django also comes with a built-in server but this is meant only for local testing and development. In production environment one must use a proper server like [Apache web server][Apache], [Gunicorn][Gunicorn], [waitress][Waitress_github] etc. to host the webapp. For e.g. our Django app is hosted on a [Gunicorn][Gunicorn] server on the [Heroku][Heroku] platform.
 
 Another point is that although we have a Django webapp running on our server, it is functionally equivalent to a REST API. REST API is a popular architecture of communicating with remote servers. [Django Rest Framework][DRF] is widely used for writing such REST APIs.
 
-Before describing the server in detail, lets mention that for the client, communicating with the server essentially boils down to sending correct HTTP request to the correct URL. Then on the server side Django will execute the view function corresponding to that URL.
+Before describing the server in detail, lets mention that for the client, communicating with the server essentially boils down to sending correct HTTP request to the correct URL. Then on the server side Django will execute the view function corresponding to that URL. The structure of a general URL looks like :
+
+``
+server_domain/requested_backend/appropriate_view_name
+``
+
+So for example if the ``server_domain=http://qsim-drop.herokuapp.com/``, and we want to use ``post_job`` view for the ``fermions`` backend i.e.  ``requested_backend=fermions`` and ``appropriate_view_name=post_job``. The complete URL will look like :
+
+``
+http://qsim-drop.herokuapp.com/fermions/post_job/
+``
 
 Now we explain different view functions and their purpose :
 * **The get_config view** : This function returns a JSON dictionary containing the backend capabilities and details. At the moment this is relevant only for the Qiskit plugin as the pennylane plugin does not make use of it.
-* **The post_job view** : This function extracts the JSON dictionary describing a potential experiment from a HTTP request. The extracted job_JSON is dumped onto the hard disk for further processing. It then responds with another JSON dictionary which has a job_id key. This job_id is important to query the server for results of the experiment later on. A typical JSON response from the server has the following schema:
+* **The post_job view** : This function extracts the JSON dictionary describing a potential experiment from a HTTP request. The extracted job_JSON is dumped onto **Dropbox** for further processing. It then responds with another JSON dictionary which has a ``job_id`` key. This job_id is important to query the server for results of the experiment later on. A typical JSON response from the server has the following schema:
 ``
 {'job_id': 'something','status': 'something','detail': 'something'}
 ``
 * **The get_job_status view** : This function extracts the job_id of a previously submitted job from a HTTP request. It responds with a JSON dictionary describing the status.
-* **The get_job_result view** : This function extracts the job_id of a previously submitted job from a HTTP request. If the job has not finished running and results are unavailable, it responds with a JSON dictionary describing the status. Otherwise it responds with a JSON dictionary describing the result. The formatting of the result dictionary is done as described in [1][eggerdj_github].
+* **The get_job_result view** : This function extracts the job_id of a previously submitted job from a HTTP request. If the job has not finished running and results are unavailable, it responds with a JSON dictionary describing the status. Otherwise it responds with a JSON dictionary describing the result. The formatting of the result dictionary is described in [1][eggerdj_github].
+* **The get_user_jobs view** : This function returns a JSON dictionary containing all the jobs a user has submitted to this particular backend.
+* **The get_next_job_in_queue view** : This function is not available to regular users. It is a very special function and is reserved for use only by the Spooler machine. Basically Spooler machine is the computer which is running the Spooler. It asks the server for the next job it should work on and the server replies with a JSON dictionary with details of the next job to be executed. From this, the Spooler knows exactly where the job JSON file is stored on Dropbox. It fetches the job JSON and starts to process it. Note that different Spoolers exist for different backends.
 
-We will frequently use the term status dictionary and result dictionary. These are just text files which host the appropriate JSON data. These files are stored on the server hard disk exactly like job_JSON. When a view reads these text files, it coverts the data in them to a python dictionary and sends it to the client or modifies the dictionary further before saving it back to the text file.
+We will frequently use the term status dictionary and result dictionary. These are just text files which host the appropriate JSON data. These files are stored on the Dropbox like job_JSON. When a view reads these text files, it coverts the data in them to a python dictionary and sends it to the client or modifies the dictionary further before saving it back to the text file.
 
-### The Spooler.py
+Since we use Dropbox to store JSONs, the view functions call functions written in a file called ``dropbox_access.py`` which in turn calls Dropbox python API functions for reading and writing to Dropbox.
 
-After the post_job view dumps the JSON files on the hard disk they have to be processed further to execute experiments on the cold atom machine. Also dumping files on the hard disk acts as a job queue so we do not need to use any extra package to queue the jobs.
+### The Dropbox storage
+We use dropbox to store all our JSONS. This has several benefits:
+* We immediately implement asynchronous job management. Basically the Heroku server dumps the job coming from the remote client onto Dropbox. Then whenever the Spooler belonging to a backend is free, it will query to ``get_next_job_in_queue`` view and act on the next job which is appropriate for that particular backend.
+* Dropbox also serves as a database storage for various JSONs, like job_JSON, result_JSON, status_JSON etc. It gives us 2 GB free storage which is a lot considering price of commercial database alternatives.
+* It allows us to unify the workflow for both simulator and real machine. Basically it does not matter what the backend is, the workflow is the identical. Different backends only differ in their Spoolers.
+* For the accessing experiment backend the remote user no longer needs the extra hassle of an SSH connection.
 
-In order to run experiments on our cold atom setup, we use the [labscript suite][labscript_github]. This means we have to convert the received JSONs into python code understandable by labscript. This is done by Spooler.py file. We will mention three parts of the labscript suite : **Runmanager**, **BLACS** and **Lyse**. Documentation about them is available at [labscript suite][labscript_github] repositories.
+Now we describe how the Dropbox folder structure is organized. It is shown in following picture :
+![](dropbox.png)
 
-The Spooler checks for a job_JSON every 3 seconds in the dump location on the hard drive. It then picks up the job_JSON that was created first and starts to process it. After all the steps of processing are done the job_JSON file is moved to a different folder.
+Now lets give an example about the work flow. Lets say a remote client named ``user_1`` submits a job to the singlequdit backend. This means ``user_1`` sent a  post request to the following URL:
 
-During processing, the spooler first checks if the JSON satisfies the schema. This is also a safety check which allows to see if the user submitted anything in the JSON which is inappropriate. After this it updates the status dictionary. Then it continues processing by using the JSON to extract an experiment python file for labscript and set the value of parameters in **Runmanager**. After generating the files and setting parameters, the spooler triggers the execution of the experiment via runmanger remote API commands. The status dictionary for that job is appropriately updated.
+``
+http://qsim-drop.herokuapp.com/singlequdit/post_job/
+``
 
-In labscript all the shots generated from a given python code are stored as HDF files. Lets say for a given experiment python file we have 10 shots i.e. 10 HDF files. These shots are passed from **Runmanager** to **BLACS** for actual execution. **BLACS** queues all the shots and executes them sequentially. All data pertaining to a shot (e.g. value of parameters, camera images etc.) is stored in its HDF file. Further data analysis is now run on these HDF files.
+The server will immediately save the JSON to **Dropbox** at ``Backend_files/Queued_Jobs/singlequdit/job-20210906_203730-singlequdit-user_1-1088f.json``. The JSON file name has special meaning as will be explained later. The file is stored here temporarily before spooler processes it. At the same time the server will reply to the user with a job_id response which might look something like :
 
-### The Result.py
-After the shots have been executed, we use **Lyse** to run analysis routines on the HDF files. There are two types of analysis routines: single shot and multi shot. Single shot routines are run on each shot individually for e.g. calculate atom number in each shot or size of atom cloud in each shot. Multishot routines are run on a collection of shots and are helpful to see for e.g. how the atom number in each shot changed as some parameter was varied across shots.
-
-Given the location of a shot folder **Lyse** can generate a pandas dataframe by reading all the values, be it **Runmanager** globals or analysis routine results. It is this pandas dataframe we are interested in.
-
-Currently by using QisKit plugin if we had to scan a parameter across shots, it was done by creating a new experiment dictionary for each value of the parameter. So for e.g. if we want to scan a parameter across 5 values, our job_JSON dictionary will have 5 nested experiment dictionaries in it, one each for a particular value of the parameter. And each of the 5 experiment dictionaries will also have a **shots** key which will tell how many times that particular experiment is repeated.
-
-When the Spooler starts execution of this JSON in labscript, it will create a job folder with job_id name. Inside this job folder there will be 5 sub-folders one for each experiment. Inside each experiment's folder will be the HDF files for the shots of that particular experiment.
-
-As the individual shots get executed they dump their complete HDF path in a separate text file (call it address_file) for each shot. This way we know which shots have finished executing. The result.py keeps checking this dump location for these address_files and selects the first created address_file. It gets the shot path in it and starts with processing of that particular shot. First it will run all single shot analysis routines on this files as defined in the **store_result()** function. The results of the single shot analysis are stored inside the HDF file by creating appropriate groups. After this it calls the  **move_to_sds()** function which will move the HDF file from this location to a network storage i.e. SDS. Also it will move the address_file of this shot from the original dump location to a new one.
-
-After moving to SDS, the result.py updates a job_dictionary which is initially read from a text file. This dictionary keeps track of all running jobs. If the job_id of the shot just moved to SDS is not in this dictionary, it is included along-with its folder location in SDS. This dictionary is also useful to determine on which job a multi-shot analysis can be run. The result.py checks the first key in this dictionary and figures out if that job is done or not. If yes then it proceeds with multi-shot analysis for that job by using **Lyse** to generate CSV from pandas dataframe for each sub-folder of the experiments in a job. After generating CSVs it generates the result JSON for this job in a specific format given by the schema we decided in [1][eggerdj_github]. Then it updates the status of this job to 'DONE'. Finally the finished job is removed from the dictionary of running jobs.
+``
+{'job_id': '20210906_203730-singlequdit-user_1-1088f','status': 'INITIALIZING','detail': 'Got your json.'}
+``
 
 
-[ls_qc_github]: https://github.com/synqs/labscript-qc "labscript-qc"
+This dictionary is also saved as a status JSON at ``Backend_files/Status/singlequdit/user_1/status-20210906_203730-singlequdit-test-1088f.json``. Note the name is quite similar to the job JSON except a ``status-`` prefix.
+
+The ``job_id`` key-value has lot of information. It has the UTC date and time of creation of the job ``20210906_203730`` which means it was created on 6 September 2021 at 20:37:30 PM UTC time. The job_id also has the user name who created this job i.e. ``user_1`` and the backend where this job is supposed to be executed i.e. ``singlequdit``. At the end the job has some random alpha-numeric string of 5 characters.
+
+On the spooler side, it will query the server for the next job it should work on. Also let us suppose the spooler is querying about the next job for ``singlequdit`` backend. The server looks for the file list in the directory ``Backend_files/Queued_Jobs/singlequdit/``. It will choose the first created file from that list. Lets say this is the file ``job-20210906_203730-singlequdit-user_1-1088f.json``. Now the server will move this file from ``Backend_files/Queued_Jobs/singlequdit/job-20210906_203730-singlequdit-user_1-1088f.json`` to ``Backend_files/Running_Jobs/job-20210906_203730-singlequdit-user_1-1088f.json`` and respond to the spooler with a ``job_msg_dict`` which looks like
+
+``{"job_id": "20210906_203730-singlequdit-user_1-1088f", "job_json": "Backend_files/Queued_Jobs/singlequdit/`` to ``Backend_files/Running_Jobs/job-20210906_203730-singlequdit-user_1-1088f.json"``
+
+From this, the Spooler knows exactly where the job JSON file is stored on Dropbox. It fetches the job JSON and starts to process it.
+
+For processing the job, the spooler begins by sanity-checking the JSON for correct schema. If the job_JSON fails this check the file is moved to  `` Backend_files/Deleted_Jobs/job-20210906_203730-singlequdit-user_1-1088f.json ``. The status JSON is also updated by the spooler to:
+
+``
+{'job_id': '20210906_203730-singlequdit-user_1-1088f','status': 'ERROR','detail': 'Got your json.; Failed json sanity check. File will be deleted. Error message : blah..blah'}
+``
+
+From the dictionary, the user is automatically informed about the details of why the error happened.
+
+If however, the job_JSON passes sanity checking, then it is executed. The spooler goes through the instruction list and creates the appropriate circuit and calculates the end result. Then it generates the given number of shots and formats everything into the result dictionary. The schema of the result dictionary is given at [1][eggerdj_github]. Then the Spooler will upload the result JSON to ``Backend_files/Result/singlequdit/user_1/result-20210906_203730-singlequdit-user_1-1088f.json``. It will also move the job JSON from ``Backend_files/Running_Jobs/job-20210906_203730-singlequdit-user_1-1088f.json`` to  ``Backend_files/Finished_Jobs/singlequdit/user_1/job-20210906_203730-singlequdit-user_1-1088f.json``. Finally the spooler will update the status JSON to:
+
+``
+{'job_id': '20210906_203730-singlequdit-user_1-1088f','status': 'DONE','detail': 'Got your json.; Passed json sanity check; Compilation done. Shots sent to solver.'}
+``
+
+This completes the execution of the job and the results are now available.
+
+### The backends
+The backend can be a real cold atom machine or a simulator running on a computer. In summary, the backend runs a spooler which is responsible for executing job_JSONs and updating status_JSONs and result_JSONs. However different backends have different Spoolers. The Spoolers of different simulator backends have similar structure. The experiment backends have slightly different implementation of spoolers. This is because simulators and real machine operate in different conditions. We first describe the simulator backend and then the experiment one.
+
+#### The simulator backend
+This is just a PC running spooler(s). The directory structure of Spooler is:
+![](spooler.png)
+
+The important file is the **maintainer.py**. It runs an endless while loop. Every 2 seconds The maintainer.py asks the serevr for the next job to be executed for a particular backend. If the server replies with a job, the maintainer will execute the appropriate Spooler.py file for that backend. If the server replied with empty response then the loop continues and maintainer.py will ask for job for the next backend defined in the list ``backends_list ``.
+
+Lets consider the case where the server replied with a job name. The maintainer will download the contents of this job_JSON and also the status_JSON. Both the job dictionary and status dictionary are passed as an argument to the ``add_job `` function of the appropriate Spooler for that backend.
+
+The ``add_job `` function will perform sanity check on the JSON and execute the circuit. Then it will upload all results and status accordingly. The details on how exactly the circuits are executed will be described in future. If you are curious just look up the code.
+
+Also note that for reading writing to Dropbox on the Spooler PC too use Dropbox python API. The commands are in the file ``drpbx.py``
+
+There are some important points to note here:
+* The maintainer.py is a python program. It might very well crash and then our simulator is no longer executing circuits. Although the server is still fine and storing jobs properly but the jobs will be in waiting queue as long as the Spooler is dead. As a quick fix to this problem, we do not run the maintainer.py file directly. Instead we have a bash script ``keep_running.sh`` which runs the maintainer.py in a loop. If python file crashes the bash script will automatically restart it. This is a temporary fix for now and will be replaced by a more professional solution using ``cron`` or ``supervisord`` in near future.
+* The spooler is a virtual machine (VM) living in the cloud. We need a professional way to deploy the code on the VM. This support also will be included in near future where whenever a developer makes a push to the Spooler github repository ``coquma-sim-spooler``, the new files are automatically copied and deployed to the VM.
+
+#### The experiment backend
+Coming soon.
+
+
+[coquma_sim_github]: https://github.com/synqs/coquma-sim/tree/modular_dropbox "coquma-sim"
 [Qiskit_github]: https://github.com/Qiskit "Qiskit"
 [Pennylane_github]: https://github.com/PennyLaneAI "Pennylane"
 [eggerdj_github]: https://github.com/eggerdj/backends/ "Qiskit_json"
 [synqs_pennylane_github]: https://github.com/synqs/pennylane-ls "penny_json"
+[Heroku]: https://www.heroku.com/home "Heroku"
 [Waitress_github]: https://github.com/Pylons/waitress "Waitress"
 [Django_github]: https://github.com/django "Django"
 [Apache]: https://httpd.apache.org/ "Apache"
