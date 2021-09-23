@@ -84,7 +84,7 @@ The ``job_id`` key-value has lot of information. It has the UTC date and time of
 
 On the spooler side, it will query the server for the next job it should work on. Also let us suppose the spooler is querying about the next job for ``singlequdit`` backend. The server looks for the file list in the directory ``Backend_files/Queued_Jobs/singlequdit/``. It will choose the first created file from that list. Lets say this is the file ``job-20210906_203730-singlequdit-user_1-1088f.json``. Now the server will move this file from ``Backend_files/Queued_Jobs/singlequdit/job-20210906_203730-singlequdit-user_1-1088f.json`` to ``Backend_files/Running_Jobs/job-20210906_203730-singlequdit-user_1-1088f.json`` and respond to the spooler with a ``job_msg_dict`` which looks like
 
-``{"job_id": "20210906_203730-singlequdit-user_1-1088f", "job_json": "Backend_files/Queued_Jobs/singlequdit/`` to ``Backend_files/Running_Jobs/job-20210906_203730-singlequdit-user_1-1088f.json"``
+``{"job_id": "20210906_203730-singlequdit-user_1-1088f", "job_json": Backend_files/Running_Jobs/job-20210906_203730-singlequdit-user_1-1088f.json"}``
 
 From this, the Spooler knows exactly where the job JSON file is stored on Dropbox. It fetches the job JSON and starts to process it.
 
