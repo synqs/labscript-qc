@@ -1,5 +1,5 @@
 # labscript-qc
-A small API to make quantum circuits accessible for labscript
+A collection of spooler code to make quantum circuits accessible for labscript.
 
 ## Read the document here:
 * Click [here](http://labscript-qc.readthedocs.io/) for the latest formatted release of the document at readthedocs.io.
