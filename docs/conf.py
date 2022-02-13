@@ -6,4 +6,4 @@ source_parsers = {
 
 source_suffix = ['.rst', '.md']
 master_doc = 'index'
-project = u'coquma-sim'
+project = u'labscript-qc'
