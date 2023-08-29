@@ -103,13 +103,18 @@ def check_json_dict(json_dict):
     return err_code.replace("\n", ".."), exp_ok
 
 
-def modify_shot_output_folder(new_dir):
+def modify_shot_output_folder(new_dir: str) -> None:
     defaut_shot_folder = str(remoteClient.get_shot_output_folder())
     modified_shot_folder = (defaut_shot_folder.rsplit("\\", 1)[0]) + "\\" + new_dir
     remoteClient.set_shot_output_folder(modified_shot_folder)
 
 
-def gen_script_and_globals(json_dict, user_id):
+def gen_script_and_globals(json_dict, user_id) -> str:
+    """
+    This is the main script that generates the labscript file.
+
+    In the sqooler project we call this the main function.
+    """
     globals_dict = {
         "user_id": "guest",
         "shots": json_dict[next(iter(json_dict))]["shots"],
@@ -169,53 +174,64 @@ def gen_script_and_globals(json_dict, user_id):
     return exp_script
 
 
-while True:
-    time.sleep(3)
-    files = list(fn for fn in next(os.walk(recieved_json_folder))[2])
-    if not files:
-        continue
-    else:
-        json_name = (sorted(files))[0]
-        ji_ui = (json_name)[5:-5]
-        job_id, user_id = ji_ui.split("-")
-        recieved_json_path = os.path.join(recieved_json_folder, json_name)
-        executed_json_path = os.path.join(executed_json_folder, json_name)
-        status_file_name = "status_" + job_id + ".json"
-        status_file_path = os.path.join(json_status_folder, status_file_name)
-        status_msg_dict = {"job_id": "None", "status": "None", "detail": "None"}
-        with open(recieved_json_path) as file:
-            data = json.load(file)
-            err_msg, json_is_fine = check_json_dict(data)
-        if json_is_fine:
-            with open(status_file_path) as status_file:
-                status_msg_dict = json.load(status_file)
-                status_msg_dict["detail"] += "; Passed json sanity check"
-            with open(status_file_path, "w") as status_file:
-                json.dump(status_msg_dict, status_file)
-            ##remoteClient.reset_shot_output_folder()
-            for exp in data:
-                exp_dict = {exp: data[exp]}
-                exp_script = gen_script_and_globals(exp_dict, user_id)
-                remoteClient.reset_shot_output_folder()
-                modify_shot_output_folder(job_id + "\\" + str(exp))
-                remoteClient.engage()  # check that this is blocking.
-            with open(status_file_path) as status_file:
-                status_msg_dict = json.load(status_file)
-                status_msg_dict["detail"] += "; Compilation done. Shots sent to BLACS"
-                status_msg_dict["status"] = "RUNNING"
-            with open(status_file_path, "w") as status_file:
-                json.dump(status_msg_dict, status_file)
-            shutil.move(recieved_json_path, executed_json_path)
-            # os.remove(recieved_json_path)
-            # os.remove(exp_script)
+def main() -> None:
+    """
+    Function for processing jobs continuously.
+    """
+    while True:
+        time.sleep(3)
+        files = list(fn for fn in next(os.walk(recieved_json_folder))[2])
+        if not files:
+            continue
         else:
-            with open(status_file_path) as status_file:
-                status_msg_dict = json.load(status_file)
-                status_msg_dict["detail"] += (
-                    "; Failed json sanity check. File will be deleted. Error message : "
-                    + err_msg
-                )
-                status_msg_dict["status"] = "ERROR"
-            with open(status_file_path, "w") as status_file:
-                json.dump(status_msg_dict, status_file)
-            os.remove(recieved_json_path)
+            json_name = (sorted(files))[0]
+            ji_ui = (json_name)[5:-5]
+            job_id, user_id = ji_ui.split("-")
+            recieved_json_path = os.path.join(recieved_json_folder, json_name)
+            executed_json_path = os.path.join(executed_json_folder, json_name)
+            status_file_name = "status_" + job_id + ".json"
+            status_file_path = os.path.join(json_status_folder, status_file_name)
+            status_msg_dict = {"job_id": "None", "status": "None", "detail": "None"}
+            with open(recieved_json_path) as file:
+                data = json.load(file)
+                err_msg, json_is_fine = check_json_dict(data)
+            if json_is_fine:
+                with open(status_file_path) as status_file:
+                    status_msg_dict = json.load(status_file)
+                    status_msg_dict["detail"] += "; Passed json sanity check"
+                with open(status_file_path, "w") as status_file:
+                    json.dump(status_msg_dict, status_file)
+                ##remoteClient.reset_shot_output_folder()
+                for exp in data:
+                    exp_dict = {exp: data[exp]}
+                    exp_script = gen_script_and_globals(exp_dict, user_id)
+                    remoteClient.reset_shot_output_folder()
+                    modify_shot_output_folder(job_id + "\\" + str(exp))
+                    remoteClient.engage()  # check that this is blocking.
+                with open(status_file_path) as status_file:
+                    status_msg_dict = json.load(status_file)
+                    status_msg_dict[
+                        "detail"
+                    ] += "; Compilation done. Shots sent to BLACS"
+                    status_msg_dict["status"] = "RUNNING"
+                with open(status_file_path, "w") as status_file:
+                    json.dump(status_msg_dict, status_file)
+                shutil.move(recieved_json_path, executed_json_path)
+                # os.remove(recieved_json_path)
+                # os.remove(exp_script)
+            else:
+                with open(status_file_path) as status_file:
+                    status_msg_dict = json.load(status_file)
+                    status_msg_dict["detail"] += (
+                        "; Failed json sanity check. File will be deleted. Error message : "
+                        + err_msg
+                    )
+                    status_msg_dict["status"] = "ERROR"
+                with open(status_file_path, "w") as status_file:
+                    json.dump(status_msg_dict, status_file)
+                os.remove(recieved_json_path)
+
+
+if __name__ == "__main__":
+    print("Now run the main spooler.")
+    main()
