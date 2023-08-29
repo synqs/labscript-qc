@@ -1,0 +1,28 @@
+site_name: labscript-qc
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.expand
+    - navigation.footer
+    - toc.follow
+
+nav:
+  - Home: index.md
+  - "User Guide": user_guide.md
+  
+repo_url: https://github.com/fretchen/labscript-qc
+edit_uri: edit/main/docs/
+
+markdown_extensions:
+  - toc
+  - attr_list
+  - md_in_html
+  - admonition
+  - footnotes
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg

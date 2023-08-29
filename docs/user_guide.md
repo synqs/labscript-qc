@@ -1,5 +1,5 @@
 # Important
-This project is just one part of the bigger framework [qlue][qlue_github]. Check out [qlue][qlue_github] for more details.
+This project is just one part of the bigger framework [qlued][qlue_github]. Check out [qlued][qlue_github] for more details.
 ## The Spooler.py
 
 After the post_job view dumps the JSON files on the hard disk they have to be processed further to execute experiments on the cold atom machine. Also dumping files on the hard disk acts as a job queue so we do not need to use any extra package to queue the jobs.
@@ -26,6 +26,6 @@ As the individual shots get executed they dump their complete HDF path in a sepa
 After moving to SDS, the result.py updates a job_dictionary which is initially read from a text file. This dictionary keeps track of all running jobs. If the job_id of the shot just moved to SDS is not in this dictionary, it is included along-with its folder location in SDS. This dictionary is also useful to determine on which job a multi-shot analysis can be run. The result.py checks the first key in this dictionary and figures out if that job is done or not. If yes then it proceeds with multi-shot analysis for that job by using **Lyse** to generate CSV from pandas dataframe for each sub-folder of the experiments in a job. After generating CSVs it generates the result JSON for this job in a specific format given by the schema we decided in [1][eggerdj_github]. Then it updates the status of this job to 'DONE'. Finally the finished job is removed from the dictionary of running jobs.
 
 
-[qlue_github]: https://github.com/synqs/qlue "qlue"
+[qlue_github]: https://github.com/alqor-ug/qlued "qlue"
 [eggerdj_github]: https://github.com/eggerdj/backends/ "Qiskit_json"
 [labscript_github]: https://github.com/labscript-suite "labscript"
