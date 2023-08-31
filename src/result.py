@@ -18,6 +18,16 @@ from lyse import dataframe_utilities
 import pandas as pd
 import h5py
 
+LOCAL_BASE_PATH = "."
+JOB_DICT_FILE = f"{LOCAL_BASE_PATH}/Running/multi_analysis_dict.json"
+RUNNING_FOLDER = f"{LOCAL_BASE_PATH}/Running"
+FINISHED_FOLDER = f"{LOCAL_BASE_PATH}/Finished"
+
+# the remote files for the the Django backend
+RESULT_JSON_FOLDER = R"Y:\uploads\results"
+JSON_STATUS_FOLDER = R"Y:\uploads\status"
+KEEP_ANALYSING_FILE = "keep_analysing.txt"
+
 
 def get_spin_up_down_atoms(
     atom_image: npt.ArrayLike, ref_image: npt.ArrayLike, dark_image: npt.ArrayLike
@@ -174,31 +184,28 @@ def do_analysis() -> None:
     """
     The main function of the module. It is running until someone stops it.
     """
-    job_dict_file = R"C:\Experiments\Job_management\Running\multi_analysis_dict.json"
-    running_folder = R"C:\Experiments\Job_management\Running"
-    finished_folder = R"C:\Experiments\Job_management\Finished"
-    result_json_folder = R"Y:\uploads\results"
-    json_status_folder = R"Y:\uploads\status"
-    keep_analysing_file = R"C:\Experiments\Job_management\keep_analysing.txt"
+
+    print("Starting analysis")
     while True:
         time.sleep(2)
-        if not os.path.isfile(keep_analysing_file):
+        print("Run again")
+        if not os.path.isfile(KEEP_ANALYSING_FILE):
             print("You must create a keep_analysing file")
             break
 
-        with open(job_dict_file, "r", encoding="utf-8") as file:
+        with open(JOB_DICT_FILE, "r", encoding="utf-8") as file:
             job_dict = json.load(file)
 
         job_id_list = list(job_dict.keys())
         file_name = list(
             fn
-            for fn in next(os.walk(running_folder))[2]
+            for fn in next(os.walk(RUNNING_FOLDER))[2]
             if fn != "multi_analysis_dict.json"
         )  # sort this list
         if file_name:
             file_name = sorted(file_name)[0]
-            running_file_path = os.path.join(running_folder, file_name)
-            finished_file_path = os.path.join(finished_folder, file_name)
+            running_file_path = os.path.join(RUNNING_FOLDER, file_name)
+            finished_file_path = os.path.join(FINISHED_FOLDER, file_name)
             with open(running_file_path, "r", encoding="utf-8") as text_file:
                 shot_path = text_file.read()
 
@@ -223,14 +230,14 @@ def do_analysis() -> None:
             gen_multishot_csvs(job_folder_for_csv)
             result_dict = create_json_result(selected_job_id, job_folder_for_csv)
             result_json_path = os.path.join(
-                result_json_folder, "result_" + selected_job_id + ".json"
+                RESULT_JSON_FOLDER, "result_" + selected_job_id + ".json"
             )
             with open(result_json_path, "w", encoding="utf-8") as file:
                 json.dump(result_dict, file)
-            change_json_status_to_done(json_status_folder, selected_job_id)
+            change_json_status_to_done(JSON_STATUS_FOLDER, selected_job_id)
             del job_dict[selected_job_id]
 
-        with open(job_dict_file, "w", encoding="utf-8") as file:
+        with open(JOB_DICT_FILE, "w", encoding="utf-8") as file:
             json.dump(job_dict, file)
 
 
