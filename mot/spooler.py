@@ -8,11 +8,18 @@ import shutil
 
 import runmanager.remote
 from jsonschema import validate
+from utils.schemes import ResultDict
 
 remoteClient = runmanager.remote.Client()
-RECEIVED_JSON_FOLDER = R"Y:\uploads"
-EXECUTED_JSON_FOLDER = R"Y:\uploads\executed"
-JSON_STATUS_FOLDER = R"Y:\uploads\status"
+
+# remote files
+REMOTE_BASE_PATH = "."
+RECEIVED_JSON_FOLDER = f"{REMOTE_BASE_PATH}"
+EXECUTED_JSON_FOLDER = f"{REMOTE_BASE_PATH}/executed"
+JSON_STATUS_FOLDER = f"{REMOTE_BASE_PATH}/status"
+
+# local files
+LOCAL_LABSCRIPT_PATH = "."
 EXP_SCRIPT_FOLDER = R"C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\labscriptlib\example_apparatus"
 HEADER_PATH = R"C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\
     labscriptlib\example_apparatus\header.py"
@@ -79,7 +86,8 @@ def check_with_schema(obj, schm):
 
 def check_json_dict(json_dict):
     """
-    This function checks if the json file is valid.
+    This function checks if the json file is valid. This should be fairly
+    straightforward to translate into the logic in the `sqooler` project.
     """
     ins_schema_dict = {
         "rLx": rLx_schema,
@@ -121,6 +129,43 @@ def check_json_dict(json_dict):
     return err_code.replace("\n", ".."), exp_ok
 
 
+def get_file_queue(dir_path: str) -> list:
+    """
+    A function that returns the list of files in the directory.
+    """
+    files = list(fn for fn in next(os.walk(dir_path))[2])
+    return files
+
+
+def get_next_job_in_queue(self, backend_name: str) -> dict:
+    """
+    A function that obtains the next job in the queue.
+
+    Args:
+        backend_name (str): The name of the backend
+
+    Returns:
+        the dict that contains the most important information about thejob
+    """
+    job_dict = {"job_id": 0, "job_json_path": "None"}
+
+    job_json_dir = "/Backend_files/Queued_Jobs/" + backend_name + "/"
+
+    job_list = self.get_file_queue(job_json_dir)
+
+    # if there is a job, we should move it
+    if job_list:
+        job_json_name = job_list[0]
+        job_dict["job_id"] = job_json_name[4:-5]
+
+        # split the .json from the job_json_name
+        job_json_name = job_json_name.split(".")[0]
+        # and move the file into the right directory
+        self.move_file(job_json_dir, "Backend_files/Running_Jobs", job_json_name)
+        job_dict["job_json_path"] = "Backend_files/Running_Jobs"
+    return job_dict
+
+
 def modify_shot_output_folder(new_dir: str) -> None:
     """
     I am not sure what this function does.
@@ -128,6 +173,70 @@ def modify_shot_output_folder(new_dir: str) -> None:
     defaut_shot_folder = str(remoteClient.get_shot_output_folder())
     modified_shot_folder = (defaut_shot_folder.rsplit("\\", 1)[0]) + "\\" + new_dir
     remoteClient.set_shot_output_folder(modified_shot_folder)
+
+
+def add_job(json_dict: dict, status_msg_dict: dict) -> tuple[ResultDict, dict]:
+    """
+    The function that translates the json with the instructions into some circuit and executes it.
+    It performs several checks for the job to see if it is properly working.
+    If things are fine the job gets added the list of things that should be executed.
+
+    json_dict: The job dictonary of all the instructions.
+    status_msg_dict: the status dictionary of the job we are treating.
+    """
+    job_id = status_msg_dict["job_id"]
+
+    result_dict: ResultDict = {
+        "display_name": self.display_name,
+        "backend_version": self.version,
+        "job_id": job_id,
+        "qobj_id": None,
+        "success": True,
+        "status": "finished",
+        "header": {},
+        "results": [],
+    }
+    err_msg, json_is_fine = self.check_json_dict(json_dict)
+    if json_is_fine:
+        # check_hilbert_space_dimension
+        dim_err_msg, dim_ok = self.check_dimension(json_dict)
+        if dim_ok:
+            for exp in json_dict:
+                exp_dict = {exp: json_dict[exp]}
+                # Here we
+                gen_script_and_globals(exp_dict, user_id)
+                remoteClient.reset_shot_output_folder()
+                modify_shot_output_folder(job_id + "\\" + str(exp))
+                remoteClient.engage()  # check that this is blocking.
+
+            status_msg_dict[
+                "detail"
+            ] += "; Passed json sanity check; Compilation done. Shots sent to solver."
+            status_msg_dict["status"] = "DONE"
+            return result_dict, status_msg_dict
+
+        status_msg_dict["detail"] += (
+            "; Failed dimensionality test. Too many atoms. File will be deleted. Error message : "
+            + dim_err_msg
+        )
+        status_msg_dict["error_message"] += (
+            "; Failed dimensionality test. Too many atoms. File will be deleted. Error message :  "
+            + dim_err_msg
+        )
+        status_msg_dict["status"] = "ERROR"
+        return result_dict, status_msg_dict
+    else:
+        status_msg_dict["detail"] += (
+            "; Failed json sanity check. File will be deleted. Error message : "
+            + err_msg
+        )
+        status_msg_dict["error_message"] += (
+            "; Failed json sanity check. File will be deleted. Error message : "
+            + err_msg
+        )
+        status_msg_dict["status"] = "ERROR"
+
+    return result_dict, status_msg_dict
 
 
 def gen_script_and_globals(json_dict, user_id) -> str:
@@ -196,63 +305,3 @@ def gen_script_and_globals(json_dict, user_id) -> str:
         exp_script
     )  # CAUTION !! This command only selects the file. It does not generate it!
     return exp_script
-
-
-def main() -> None:
-    """
-    Function for processing jobs continuously.
-    """
-    while True:
-        time.sleep(3)
-        files = list(fn for fn in next(os.walk(RECEIVED_JSON_FOLDER))[2])
-        if not files:
-            continue
-
-        json_name = (sorted(files))[0]
-        ji_ui = (json_name)[5:-5]
-        job_id, user_id = ji_ui.split("-")
-        recieved_json_path = os.path.join(RECEIVED_JSON_FOLDER, json_name)
-        executed_json_path = os.path.join(EXECUTED_JSON_FOLDER, json_name)
-        status_file_name = "status_" + job_id + ".json"
-        status_file_path = os.path.join(JSON_STATUS_FOLDER, status_file_name)
-        status_msg_dict = {"job_id": "None", "status": "None", "detail": "None"}
-        with open(recieved_json_path, encoding="UTF-8") as file:
-            data = json.load(file)
-            err_msg, json_is_fine = check_json_dict(data)
-        if json_is_fine:
-            with open(status_file_path, encoding="UTF-8") as status_file:
-                status_msg_dict = json.load(status_file)
-                status_msg_dict["detail"] += "; Passed json sanity check"
-            with open(status_file_path, "w", encoding="UTF-8") as status_file:
-                json.dump(status_msg_dict, status_file)
-            for exp in data:
-                exp_dict = {exp: data[exp]}
-                gen_script_and_globals(exp_dict, user_id)
-                remoteClient.reset_shot_output_folder()
-                modify_shot_output_folder(job_id + "\\" + str(exp))
-                remoteClient.engage()  # check that this is blocking.
-            with open(status_file_path, encoding="UTF-8") as status_file:
-                status_msg_dict = json.load(status_file)
-                status_msg_dict["detail"] += "; Compilation done. Shots sent to BLACS"
-                status_msg_dict["status"] = "RUNNING"
-            with open(status_file_path, "w", encoding="UTF-8") as status_file:
-                json.dump(status_msg_dict, status_file)
-            shutil.move(recieved_json_path, executed_json_path)
-            # os.remove(recieved_json_path)
-            # os.remove(exp_script)
-        else:
-            with open(status_file_path, encoding="UTF-8") as status_file:
-                status_msg_dict = json.load(status_file)
-                status_msg_dict["detail"] += (
-                    "; Failed json sanity check. File will be deleted. Error message : "
-                    + err_msg
-                )
-                status_msg_dict["status"] = "ERROR"
-            with open(status_file_path, "w", encoding="UTF-8") as status_file:
-                json.dump(status_msg_dict, status_file)
-            os.remove(recieved_json_path)
-
-
-if __name__ == "__main__":
-    print("Now run the main spooler.")
-    main()

@@ -22,11 +22,11 @@ LOCAL_BASE_PATH = "."
 JOB_DICT_FILE = f"{LOCAL_BASE_PATH}/Running/multi_analysis_dict.json"
 RUNNING_FOLDER = f"{LOCAL_BASE_PATH}/Running"
 FINISHED_FOLDER = f"{LOCAL_BASE_PATH}/Finished"
+KEEP_ANALYSING_FILE = "keep_analysing.txt"
 
 # the remote files for the the Django backend
 RESULT_JSON_FOLDER = R"Y:\uploads\results"
 JSON_STATUS_FOLDER = R"Y:\uploads\status"
-KEEP_ANALYSING_FILE = "keep_analysing.txt"
 
 
 def get_spin_up_down_atoms(
