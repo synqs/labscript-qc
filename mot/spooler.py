@@ -16,7 +16,7 @@ EXECUTED_JSON_FOLDER = f"{REMOTE_BASE_PATH}/executed"
 JSON_STATUS_FOLDER = f"{REMOTE_BASE_PATH}/status"
 
 # local files
-LOCAL_LABSCRIPT_PATH = "."
+LOCAL_LABSCRIPT_PATH = "~/labscript-suite/userlib/labscriptlib/mot"
 HEADER_PATH = R"C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\
     labscriptlib\example_apparatus\header.py"
 EXP_SCRIPT_FOLDER = R"C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\labscriptlib\example_apparatus"

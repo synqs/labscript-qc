@@ -6,3 +6,4 @@ jsonschema==4.19.0
 dropbox==11.36.2
 pymongo==4.5.0
 python-decouple==3.8
+labscript-suite==3.2.0
