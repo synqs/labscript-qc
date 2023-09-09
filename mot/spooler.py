@@ -54,7 +54,6 @@ def gen_script_and_globals(json_dict: dict, job_id: str) -> str:
         "shots": json_dict[next(iter(json_dict))]["shots"],
     }
 
-    pprint(json_dict)
     globals_dict["shots"] = 4
     globals_dict["job_id"] = job_id
 
