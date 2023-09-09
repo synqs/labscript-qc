@@ -5,7 +5,6 @@ import os
 from pprint import pprint
 import runmanager.remote
 
-from jsonschema import validate
 
 remoteClient = runmanager.remote.Client()
 
@@ -15,11 +14,11 @@ RECEIVED_JSON_FOLDER = f"{REMOTE_BASE_PATH}"
 EXECUTED_JSON_FOLDER = f"{REMOTE_BASE_PATH}/executed"
 JSON_STATUS_FOLDER = f"{REMOTE_BASE_PATH}/status"
 
+
+# in the labscript ini file this is equivalent to the the path `labscriptlib`
+EXP_SCRIPT_FOLDER = "/Users/fredjendrzejewski/labscript-suite/userlib/labscriptlib/mot"
 # local files
-LOCAL_LABSCRIPT_PATH = "~/labscript-suite/userlib/labscriptlib/mot"
-HEADER_PATH = R"C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\
-    labscriptlib\example_apparatus\header.py"
-EXP_SCRIPT_FOLDER = R"C:\Users\Rohit_Prasad_Bhatt\labscript-suite\userlib\labscriptlib\example_apparatus"
+HEADER_PATH = f"{EXP_SCRIPT_FOLDER}/header.py"
 
 
 def get_file_queue(dir_path: str) -> list:
@@ -58,32 +57,23 @@ def gen_script_and_globals(json_dict: dict, job_id: str) -> str:
     pprint(json_dict)
     globals_dict["shots"] = 4
     globals_dict["job_id"] = job_id
-    print("Start to set the globals")
 
     # TODO: this is currently hanging
-    remoteClient.set_globals(globals_dict)
-    print("Finished with the globals")
+    # let us simply comment it for the moment as we do not know what it does
+    # anyways
+    # remoteClient.set_globals(globals_dict)
     script_name = f"experiment_{globals_dict['job_id']}.py"
     exp_script = os.path.join(EXP_SCRIPT_FOLDER, script_name)
     ins_list = json_dict[next(iter(json_dict))]["instructions"]
-    # TODO: this should come from the config file
-    func_dict = {
-        "rLx": "rLx",
-        "rLz2": "rLz2",
-        "rLz": "rLz",
-        "delay": "delay",
-        "measure": "measure",
-        "barrier": "barrier",
-    }
+    print(f"File path: {exp_script}")
     code = ""
+    # this is the top part of the script it allows us to import the
+    # typical functions that we require for each single sequence
+    with open(HEADER_PATH, "r", encoding="UTF-8") as header_file:
+        code = header_file.read()
 
-    # pylint: disable=bare-except
-    try:
-        with open(HEADER_PATH, "r", encoding="UTF-8") as header_file:
-            code = header_file.read()
-    except:
-        print("Something wrong. Does header file exists?")
-
+    # add a line break to the code
+    code += "\n"
     # pylint: disable=bare-except
     try:
         with open(exp_script, "w", encoding="UTF-8") as script_file:
@@ -92,7 +82,9 @@ def gen_script_and_globals(json_dict: dict, job_id: str) -> str:
         print("Something wrong. Does file path exists?")
 
     for inst in ins_list:
-        func_name = func_dict[inst[0]]
+        # we can directly use the function name as we have already verified
+        # that the function exists in the `add_job` function
+        func_name = inst[0]
         params = "(" + str(inst[1:])[1:-1] + ")"
         code = "Experiment." + func_name + params + "\n"
 
