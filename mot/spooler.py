@@ -60,7 +60,7 @@ def gen_script_and_globals(json_dict: dict, job_id: str) -> str:
     # TODO: this is currently hanging
     # let us simply comment it for the moment as we do not know what it does
     # anyways
-    # remoteClient.set_globals(globals_dict)
+    remoteClient.set_globals(globals_dict)
     script_name = f"experiment_{globals_dict['job_id']}.py"
     exp_script = os.path.join(EXP_SCRIPT_FOLDER, script_name)
     ins_list = json_dict[next(iter(json_dict))]["instructions"]
