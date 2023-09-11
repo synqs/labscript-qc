@@ -32,9 +32,14 @@ def get_file_queue(dir_path: str) -> list:
 def modify_shot_output_folder(new_dir: str) -> None:
     """
     I am not sure what this function does.
+
+    Args:
+        new_dir: The new directory under which we save the shots.
     """
     defaut_shot_folder = str(remoteClient.get_shot_output_folder())
-    modified_shot_folder = (defaut_shot_folder.rsplit("\\", 1)[0]) + "\\" + new_dir
+    print(f"Default shot folder: {defaut_shot_folder}")
+    modified_shot_folder = (defaut_shot_folder.rsplit("\\", 1)[0]) + "/" + new_dir
+    print(f"Modified shot folder: {modified_shot_folder}")
     remoteClient.set_shot_output_folder(modified_shot_folder)
 
 
@@ -53,7 +58,7 @@ def gen_script_and_globals(json_dict: dict, job_id: str) -> str:
         "job_id": "guest",
         "shots": json_dict[next(iter(json_dict))]["shots"],
     }
-
+    pprint(json_dict)
     globals_dict["shots"] = 4
     globals_dict["job_id"] = job_id
 
@@ -106,4 +111,6 @@ def gen_script_and_globals(json_dict: dict, job_id: str) -> str:
         exp_script
     )  # CAUTION !! This command only selects the file. It does not generate it!
     print("Script generated.")
+
+    remoteClient.engage()  # check that this is blocking.
     return exp_script

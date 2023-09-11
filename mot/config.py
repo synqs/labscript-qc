@@ -13,7 +13,8 @@ from utils.schemes import (
     ResultDict,
 )
 
-from .spooler import gen_script_and_globals
+from pprint import pprint
+from .spooler import gen_script_and_globals, modify_shot_output_folder, remoteClient
 
 N_MAX_SHOTS = 1000000
 N_MAX_ATOMS = 500
@@ -115,8 +116,14 @@ class MotSpooler(Spooler):
             dim_err_msg, dim_ok = self.check_dimension(json_dict)
             if dim_ok:
                 for exp in json_dict:
+                    pprint("exp")
+                    pprint(exp)
                     exp_dict = {exp: json_dict[exp]}
-                    # Here we
+                    # prepare the shots folder
+                    remoteClient.reset_shot_output_folder()
+                    modify_shot_output_folder(job_id + "/" + str(exp))
+
+                    # Here we generate the ciruit
                     result_dict["results"].append(self.gen_circuit(exp_dict, job_id))
 
                 status_msg_dict[
